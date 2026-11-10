@@ -331,37 +331,97 @@ class Window(QMainWindow):
         dates=t.get('dates') or [t.get('date','')]
         return ' · '.join(datetime.date.fromisoformat(x).strftime('%d-%m-%Y') if x else '' for x in dates)
     def overview_page(self):
-        self.header('Overview','Upcoming tournaments and preparation at a glance',('+ New Tournament',self.create))
+        self.header('DASHBOARD','TOURNAMENT OPERATIONS / OVERVIEW',('+ NEW TOURNAMENT',self.create))
         items=overview(self.data)
-        summary=QFrame();summary.setObjectName('surface');sr=layout_row(summary,18,(20,16,20,16))
-        for title,value in [('Upcoming / active',len(items)),('Outstanding tasks',sum(len(x['pending']) for x in items)),('Needs attention',sum(bool(x['warnings']) for x in items))]:
-            cell=QWidget();cv=layout_col(cell,5);cv.addWidget(label(str(value),'heading'));cv.addWidget(label(title,'muted'));sr.addWidget(cell,1)
-        self.cv.addWidget(summary);self.cv.addSpacing(22)
-        self.cv.addWidget(label('Upcoming tournaments','subheading'));self.cv.addSpacing(16)
+        total_pending=sum(len(x['pending']) for x in items)
+        attention=sum(bool(x['warnings']) for x in items)
+        stats=QWidget();stats_row=layout_row(stats,10)
+        for title,value,tone in [
+            ('UPCOMING / ACTIVE',len(items),'#e8e8ec'),
+            ('OUTSTANDING TASKS',total_pending,'#e8e8ec'),
+            ('NEEDS ATTENTION',attention,'#f0bd75' if attention else '#58d900'),
+            ('REGISTERED TEAMS',len(self.data.get('teams_db',{})),'#e8e8ec')]:
+            card=QFrame();card.setObjectName('surface')
+            column=layout_col(card,8,(15,13,15,13))
+            heading=label(title,'muted')
+            heading.setStyleSheet('color:#9e9ea5;font-size:11px;letter-spacing:0.5px;')
+            column.addWidget(heading)
+            value_label=label(str(value),'heading')
+            value_label.setStyleSheet(f'font-size:28px;font-weight:700;color:{tone};')
+            column.addWidget(value_label)
+            stats_row.addWidget(card,1)
+        self.cv.addWidget(stats)
+        self.cv.addSpacing(17)
+
+        body=QWidget();body_row=layout_row(body,13)
+        left=QWidget();left_col=layout_col(left,10)
+        right=QWidget();right_col=layout_col(right,10)
+        left_col.addWidget(label('UPCOMING TOURNAMENTS','subheading'))
         if not items:
-            self.cv.addWidget(label('No active tournaments. Create one to begin preparation.','muted'))
-        for i,item in enumerate(items):
-            if i:self.cv.addSpacing(12)
-            t=item['tournament'];card=QFrame();card.setObjectName('surface');r=layout_row(card,18,(20,16,20,16))
-            left=QWidget();v=layout_col(left,8)
-            v.addWidget(label(t.get('name','Untitled tournament'),'subheading'))
-            date=item['date'].strftime('%d-%m-%Y') if item['date'] else 'Date not set'
-            v.addWidget(label(f"{date}  ·  {t.get('format','')}  ·  {t.get('status','Preparing')}",'muted'))
-            progress=QProgressBar();progress.setRange(0,max(1,item['total']));progress.setValue(item['completed']);progress.setTextVisible(False);v.addWidget(progress)
-            v.addWidget(label(f"{item['completed']} / {item['total']} preparation tasks complete",'muted'))
-            for warning in item['warnings'][:3]:
-                w=label('!  '+warning);w.setStyleSheet('color:#f0bd75;');v.addWidget(w)
-            for key,name,kind in item['pending'][:3]:
-                task=button(('○  ' if kind=='manual' else '→  ')+name,lambda checked=False,tid=t['id'],k=key:self.open_overview_task(tid,k))
-                task.setStyleSheet('text-align:left;');v.addWidget(task)
-            if len(item['pending'])>3:v.addWidget(label(f"+ {len(item['pending'])-3} more outstanding tasks",'muted'))
-            r.addWidget(left,1)
-            r.addWidget(button('Open checklist  →',lambda checked=False,tid=t['id']:self.open_t(tid)))
-            self.cv.addWidget(card)
-        self.cv.addSpacing(24)
-        self.cv.addWidget(label('Competitive snapshot','subheading'));self.cv.addSpacing(12)
-        self.cv.addWidget(label(f"{len(self.data.get('tournaments',[]))} total tournaments    ·    {len(self.player_records())} known players    ·    {len(self.data.get('teams_db',{}))} registered teams",'muted'))
-        self.cv.addStretch()
+            empty=QFrame();empty.setObjectName('surface')
+            ec=layout_col(empty,10,(18,18,18,18))
+            ec.addWidget(label('NO UPCOMING TOURNAMENTS','subheading'))
+            ec.addWidget(label('Create a tournament to begin preparation.','muted'))
+            ec.addWidget(button('+ NEW TOURNAMENT',self.create,True))
+            left_col.addWidget(empty)
+        for item in items:
+            t=item['tournament']
+            card=QFrame();card.setObjectName('surface')
+            cv=layout_col(card,10,(16,13,16,13))
+            title_row=QWidget();tr=layout_row(title_row,8)
+            tr.addWidget(label(t.get('name','Untitled tournament').upper(),'subheading'),1)
+            state=label(str(t.get('status','Preparing')).upper())
+            state.setStyleSheet('color:#58d900;font-size:11px;')
+            tr.addWidget(state)
+            cv.addWidget(title_row)
+            date=item['date'].strftime('%d-%m-%Y') if item['date'] else 'DATE NOT SET'
+            cv.addWidget(label(f"{date}  /  {t.get('format','').upper()}",'muted'))
+            progress_row=QWidget();pr=layout_row(progress_row,8)
+            pr.addWidget(label('PREPARATION','muted'),1)
+            pr.addWidget(label(f"{item['completed']} / {item['total']}",'muted'))
+            cv.addWidget(progress_row)
+            progress=QProgressBar();progress.setRange(0,max(1,item['total']))
+            progress.setValue(item['completed']);progress.setTextVisible(False)
+            cv.addWidget(progress)
+            for warning in item['warnings'][:2]:
+                warning_label=label('!  '+warning)
+                warning_label.setStyleSheet('color:#f0bd75;')
+                cv.addWidget(warning_label)
+            pending=item['pending']
+            for key,name,kind in pending[:2]:
+                task=button(('□  ' if kind=='manual' else '→  ')+name,
+                            lambda checked=False,tid=t['id'],k=key:self.open_overview_task(tid,k))
+                task.setStyleSheet('text-align:left;background:#39393c;border:1px solid #454549;padding:7px 9px;')
+                cv.addWidget(task)
+            if len(pending)>2:
+                cv.addWidget(label(f"+ {len(pending)-2} MORE OUTSTANDING TASKS",'muted'))
+            cv.addWidget(button('OPEN TOURNAMENT  →',lambda checked=False,tid=t['id']:self.open_t(tid)))
+            left_col.addWidget(card)
+        left_col.addStretch()
+        right_col.addWidget(label('OPERATIONS','subheading'))
+        side=QFrame();side.setObjectName('surface')
+        sc=layout_col(side,12,(15,15,15,15))
+        sc.addWidget(label('COMPETITIVE SNAPSHOT','muted'))
+        for title,value in [
+            ('TOTAL TOURNAMENTS',len(self.data.get('tournaments',[]))),
+            ('KNOWN PLAYERS',len(self.player_records())),
+            ('REGISTERED TEAMS',len(self.data.get('teams_db',{})))]:
+            line=QWidget();lr=layout_row(line,8)
+            lr.addWidget(label(title,'muted'),1)
+            number=label(str(value));number.setStyleSheet('color:#58d900;font-weight:700;')
+            lr.addWidget(number)
+            sc.addWidget(line)
+        right_col.addWidget(side)
+        shortcuts=QFrame();shortcuts.setObjectName('surface')
+        qc=layout_col(shortcuts,9,(15,15,15,15))
+        qc.addWidget(label('QUICK ACCESS','muted'))
+        for name,section in [('TOURNAMENTS','Tournaments'),('PLAYERS','Players'),('TEAMS','Teams')]:
+            qc.addWidget(button(name+'  →',lambda checked=False,target=section:self.navigate(target)))
+        right_col.addWidget(shortcuts)
+        right_col.addStretch()
+        body_row.addWidget(left,3)
+        body_row.addWidget(right,1)
+        self.cv.addWidget(body,1)
 
     def open_overview_task(self,tournament_id,key):
         self.open_t(tournament_id)
