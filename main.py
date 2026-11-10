@@ -6,7 +6,7 @@ from overview_logic import overview, task_complete, deadline_status
 from team_reconciliation import reconcile_teams
 from notifications import due_events, event_key, send_discord, validate_webhook
 from PySide6.QtCore import Qt, QDate, QDateTime, QSize, QUrl, QTimer, QObject, Signal, QByteArray
-from PySide6.QtGui import QPixmap, QIcon, QPainter
+from PySide6.QtGui import QPixmap, QIcon, QPainter, QFontDatabase, QFont
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QStackedWidget,QScrollArea,QTableWidget,QTableWidgetItem,QHeaderView,QLineEdit,QDialog,QFormLayout,QDateEdit,QDateTimeEdit,QComboBox,QSpinBox,QCheckBox,QDialogButtonBox,QFileDialog,QMessageBox,QTextEdit,QInputDialog,QTabWidget,QAbstractItemView,QSplitter,QProgressBar,QGroupBox,QSystemTrayIcon,QStyle)
 
@@ -18,33 +18,44 @@ VERSION='1.0.2'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
 TASKS=[('announce','Announce tournament','manual'),('qopen','Announce qualifiers open','manual'),('qclose','Announce qualifiers closed','manual'),('received','Receive stream key document & tournament export from developer','manual'),('files','Upload stream key document & tournament export','auto'),('tickets','Add team players to their team ticket','manual'),('congrats','Send congratulations / acceptance and misc info','manual'),('guide','Send OBS guide in team tickets','manual'),('keys','DM stream keys to players','auto'),('bracket','Create bracket via Bracket HQ','manual'),('games','Create tournament games','manual'),('live','Announce tournament is live','manual'),('results','Record tournament results','manual')]
 STYLE='''
-QWidget {background:transparent;color:#e9eeee;font-family:"Segoe UI";font-size:13px;}
-QWidget#appRoot {background:#101315;}
+QWidget {background:transparent;color:#e8e8ec;font-family:"Pixelify Sans";font-size:13px;}
+QWidget#appRoot {background:#242426;}
 QLabel {background:transparent;border:none;}
 QFrame {background:transparent;}
-QFrame#sidebar {background:#151a1c;border-right:1px solid #252d2e;}
-QFrame#surface {background:#1a2022;border:1px solid #293134;border-radius:12px;}
-QFrame#task {background:transparent;border-bottom:1px solid #273033;}
+QFrame#sidebar {background:#323234;border-right:1px solid #49494c;}
+QFrame#surface {background:#323234;border:1px solid #3c3c40;border-radius:0px;}
+QFrame#task {background:#39393c;border-bottom:1px solid #454549;}
 QFrame#surface QLabel,QFrame#surface QWidget,QFrame#task QLabel,QFrame#task QWidget {background:transparent;}
-QProgressBar {background:#222b2d;border:0;border-radius:3px;height:6px;text-align:center;}
-QProgressBar::chunk {background:#83e38b;border-radius:3px;}
-QLabel#muted {color:#8d9b9b;} QLabel#heading {font-size:27px;font-weight:700;} QLabel#subheading {font-size:17px;font-weight:650;}
-QPushButton {background:#242c2e;border:1px solid #354043;border-radius:7px;padding:9px 13px;text-align:center;font-weight:550;}
-QPushButton:hover {background:#303a3d;border-color:#556464;}
-QPushButton#primary {background:#83e38b;color:#102016;border:0;font-weight:700;}
-QPushButton#primary:hover {background:#a0f1a7;}
-QPushButton#nav {background:transparent;border:0;text-align:left;padding:13px 17px;color:#aebcbd;font-size:14px;}
-QPushButton#nav:hover {background:#222c2d;color:white;}
-QPushButton#navActive {background:#24372b;border:0;border-left:3px solid #83e38b;text-align:left;padding:13px 17px;color:#b9f5be;font-weight:700;font-size:14px;}
-QPushButton#tab {background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;color:#99a9a9;padding:13px 18px;}
-QPushButton#tabActive {background:transparent;border:0;border-bottom:2px solid #83e38b;border-radius:0;color:#d7f9db;padding:13px 18px;font-weight:700;}
-QLineEdit,QTextEdit,QComboBox,QDateEdit,QSpinBox {background:#1d2527;border:1px solid #3a4648;border-radius:7px;padding:8px;selection-background-color:#3e7550;}
-QTableWidget {background:#171c1e;alternate-background-color:#1b2224;border:1px solid #293335;border-radius:8px;gridline-color:#293335;}
-QHeaderView::section {background:#222a2c;color:#a7b4b4;padding:10px;border:0;border-bottom:1px solid #384143;font-weight:600;}
-QTableWidget::item {padding:6px;} QTableWidget::item:selected {background:#2c4835;}
-QCheckBox {spacing:10px;background:transparent;} 
-QScrollArea {border:0;} QTabWidget::pane {border:0;}
+QProgressBar {background:#424246;border:0;border-radius:0px;height:7px;text-align:center;}
+QProgressBar::chunk {background:#53d900;border-radius:0px;}
+QLabel#muted {color:#93939c;font-size:12px;}
+QLabel#heading {font-size:24px;font-weight:700;}
+QLabel#subheading {font-size:17px;font-weight:700;}
+QPushButton {background:#37373a;border:1px solid #4a4a4e;border-radius:0px;padding:8px 11px;text-align:center;font-weight:600;}
+QPushButton:hover {background:#444449;border-color:#606066;}
+QPushButton:disabled {color:#74747a;background:#303033;}
+QPushButton#primary {background:#53d900;color:#18200e;border:1px solid #53d900;font-weight:700;}
+QPushButton#primary:hover {background:#6bef15;}
+QPushButton#nav {background:transparent;border:0;border-left:2px solid transparent;text-align:left;padding:10px 15px;color:#b9b9c0;font-size:13px;}
+QPushButton#nav:hover {background:#3b3b3f;color:#fff;}
+QPushButton#navActive {background:#394630;border:0;border-left:2px solid #58dd00;text-align:left;padding:10px 15px;color:#5be000;font-weight:700;font-size:13px;}
+QPushButton#tab {background:transparent;border:0;border-bottom:1px solid transparent;border-radius:0;color:#aaaab3;padding:10px 12px;font-size:12px;}
+QPushButton#tabActive {background:transparent;border:0;border-bottom:2px solid #57db00;border-radius:0;color:#5be000;padding:10px 12px;font-weight:700;font-size:12px;}
+QLineEdit,QTextEdit,QComboBox,QDateEdit,QDateTimeEdit,QSpinBox {background:#333336;border:1px solid #4a4a4f;border-radius:0;padding:7px;selection-background-color:#4d712d;}
+QLineEdit:focus,QTextEdit:focus,QComboBox:focus {border:1px solid #63c823;}
+QTableWidget {background:#2d2d30;alternate-background-color:#323235;border:1px solid #454549;border-radius:0;gridline-color:#414145;}
+QHeaderView::section {background:#323235;color:#9c9ca5;padding:8px;border:0;border-bottom:1px solid #48484d;font-size:12px;font-weight:600;}
+QTableWidget::item {padding:5px;border-bottom:1px solid #3e3e42;}
+QTableWidget::item:selected {background:#3a4b31;color:#eaf4e4;}
+QCheckBox {spacing:8px;background:transparent;}
+QScrollArea {border:0;background:transparent;}
+QTabWidget::pane {border:0;}
+QGroupBox {border:1px solid #444449;margin-top:12px;padding:12px;border-radius:0;}
+QGroupBox::title {color:#9d9da5;subcontrol-origin:margin;left:10px;}
+QDialog {background:#2a2a2d;}
+QToolTip {background:#37373a;color:#f0f0f2;border:1px solid #535358;padding:5px;}
 '''
+
 
 def load():
     if DATA.exists():
@@ -157,18 +168,18 @@ class Window(QMainWindow):
         self.setWindowTitle('Arena Tournament Manager');self.resize(1420,890);self.setMinimumSize(1050,680)
         if ASSET.exists():self.setWindowIcon(QIcon(str(ASSET)))
         shell=QWidget();shell.setObjectName("appRoot");self.setCentralWidget(shell);root=layout_row(shell,0)
-        self.sidebar=QFrame();self.sidebar.setObjectName('sidebar');self.sidebar.setFixedWidth(224);sv=layout_col(self.sidebar,8,(16,26,16,18));root.addWidget(self.sidebar)
-        brand=QWidget();br=layout_row(brand,13);brand.setMinimumHeight(54)
+        self.sidebar=QFrame();self.sidebar.setObjectName('sidebar');self.sidebar.setFixedWidth(211);sv=layout_col(self.sidebar,3,(0,12,0,12));root.addWidget(self.sidebar)
+        brand=QWidget();br=layout_row(brand,10,(16,0,12,0));brand.setMinimumHeight(54)
         if ASSET.exists():
-            logo=QLabel();logo.setPixmap(QPixmap(str(ASSET)).scaled(43,43,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation));br.addWidget(logo)
-        brandname=label('ARENA\nTOURNAMENT MANAGER');brandname.setStyleSheet('background:transparent;font-weight:750;font-size:12px;letter-spacing:0.5px;');br.addWidget(brandname,1);sv.addWidget(brand);sv.addSpacing(28)
+            logo=QLabel();logo.setPixmap(QPixmap(str(ASSET)).scaled(30,30,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation));br.addWidget(logo)
+        brandname=label('ARENA\nTOURNAMENT MANAGER');brandname.setStyleSheet('background:transparent;font-weight:750;font-size:12px;letter-spacing:0.4px;');br.addWidget(brandname,1);sv.addWidget(brand);sv.addSpacing(13);sv.addWidget(label('  MANAGEMENT','muted'));sv.addSpacing(5)
         self.nav={}
         for title in ('Overview','Tournaments','Players','Teams','Settings'):
             b=button(title,lambda _,s=title:self.navigate(s))
-            b.setIcon(nav_icon(title));b.setIconSize(QSize(20,20))
+            b.setIcon(nav_icon(title));b.setIconSize(QSize(16,16))
             self.nav[title]=b;sv.addWidget(b)
         sv.addStretch();sv.addWidget(label('●  Local database','muted'));self.update_button=button('Check for updates',lambda:self.navigate('Settings'));sv.addWidget(self.update_button);sv.addWidget(label('Version '+VERSION,'muted'))
-        self.content=QWidget();self.cv=layout_col(self.content,0,(32,26,32,26));root.addWidget(self.content,1)
+        self.content=QWidget();self.cv=layout_col(self.content,0,(22,22,22,22));root.addWidget(self.content,1)
         self.render()
         if self.reconcile_ambiguous:
             QTimer.singleShot(100,lambda:QMessageBox.warning(self,'Team reconciliation needs review','These team names could not be matched safely and were left unchanged:\n'+', '.join(self.reconcile_ambiguous)))
@@ -1061,7 +1072,14 @@ if __name__=='__main__':
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('TournamentManager.Desktop')
         except (AttributeError, OSError):
             pass
-    app=QApplication(sys.argv);app.setStyle('Fusion');app.setStyleSheet(STYLE)
+    app=QApplication(sys.argv);app.setStyle('Fusion')
+    font_path=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))/'assets'/'PixelifySans.ttf'
+    if font_path.exists():
+        font_id=QFontDatabase.addApplicationFont(str(font_path))
+        families=QFontDatabase.applicationFontFamilies(font_id) if font_id>=0 else []
+        if families:
+            app.setFont(QFont(families[0],11))
+    app.setStyleSheet(STYLE)
     try:win=Window()
     except Exception as e:
         QMessageBox.critical(None,'Cannot start Arena Tournament Manager',str(e));sys.exit(1)
