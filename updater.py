@@ -38,28 +38,47 @@ def get_latest():
             'notes': release.get('body', '')[:4000]}
 
 
-def _download(url, target, limit):
+def _download(url, target, limit, progress=None):
     if not url.startswith('https://github.com/'):
         raise ValueError('Untrusted release URL')
     req = urllib.request.Request(url, headers={'User-Agent':'ArenaTournamentManager-Updater'})
     with urllib.request.urlopen(req, timeout=45) as response:
         if not response.geturl().startswith('https://'):
             raise ValueError('Insecure download redirect')
+        declared = response.headers.get('Content-Length')
+        total = int(declared) if declared and declared.isdigit() else None
+        if total is not None and total > limit:
+            raise ValueError('Download exceeds limit')
+        downloaded = 0
+        if progress:
+            progress(downloaded, total)
         with Path(target).open('wb') as output:
-            while chunk := response.read(1024*1024):
-                output.write(chunk)
-                if output.tell() > limit:
+            while chunk := response.read(1024 * 1024):
+                downloaded += len(chunk)
+                if downloaded > limit:
                     raise ValueError('Download exceeds limit')
+                output.write(chunk)
+                if progress:
+                    progress(downloaded, total)
+        if total is not None and downloaded != total:
+            raise ValueError('Incomplete download')
 
 
-def stage_update(info, data_dir):
+def stage_update(info, data_dir, progress=None):
+    """Download and validate a release; progress(stage, received, total) is optional."""
     if not info['download_url'].startswith(f'https://github.com/{REPO}/releases/download/'):
         raise ValueError('Release URL does not match configured repository')
     stage = Path(tempfile.mkdtemp(prefix='arena-update-'))
+    def notify(name, received=0, total=None):
+        if progress:
+            progress(name, received, total)
     try:
         archive = stage / ASSET
-        checksum = stage / (ASSET+'.sha256')
-        _download(info['download_url'], archive, MAX_SIZE)
+        checksum = stage / (ASSET + '.sha256')
+        notify('Downloading', 0, None)
+        _download(info['download_url'], archive, MAX_SIZE,
+                  lambda received, total: notify('Downloading', received, total))
+        notify('Verifying')
         _download(info['checksum_url'], checksum, 1024)
         expected = checksum.read_text(encoding='ascii').split()[0].lower()
         if len(expected) != 64 or any(c not in '0123456789abcdef' for c in expected):
@@ -78,8 +97,9 @@ def stage_update(info, data_dir):
                     raise ValueError('Unsafe path in release archive')
                 if entry.file_size > MAX_SIZE:
                     raise ValueError('Oversized archive member')
-            if sum(i.file_size for i in entries) > 900*1024*1024:
+            if sum(i.file_size for i in entries) > 900 * 1024 * 1024:
                 raise ValueError('Unpacked release is too large')
+        notify('Ready')
         return archive
     except Exception:
         shutil.rmtree(stage, ignore_errors=True)
