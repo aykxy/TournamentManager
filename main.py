@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFrame,QVBoxLayo
 BASE=Path.home()/'ArenaTournamentManager'; BASE.mkdir(exist_ok=True)
 DATA=BASE/'tournaments.json'
 ASSET=Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'assets'/'arena_logo.png'
-GREEN='#83e38b'
+GREEN='#58dc00'
 VERSION='1.0.2'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
 TASKS=[('announce','Announce tournament','manual'),('qopen','Announce qualifiers open','manual'),('qclose','Announce qualifiers closed','manual'),('received','Receive stream key document & tournament export from developer','manual'),('files','Upload stream key document & tournament export','auto'),('tickets','Add team players to their team ticket','manual'),('congrats','Send congratulations / acceptance and misc info','manual'),('guide','Send OBS guide in team tickets','manual'),('keys','DM stream keys to players','auto'),('bracket','Create bracket via Bracket HQ','manual'),('games','Create tournament games','manual'),('live','Announce tournament is live','manual'),('results','Record tournament results','manual')]
@@ -431,17 +431,48 @@ class Window(QMainWindow):
         elif key=='bracket':self.change_tab('Bracket')
 
     def tournaments_page(self):
-        self.header('Tournaments','All your tournaments in one place',('+ New Tournament',self.create))
-        self.cv.addWidget(button('Recently Deleted / Restore',self.restore_tournament))
-        self.cv.addSpacing(20)
-        self.tournament_rows(self.data['tournaments']);self.cv.addStretch()
-    def tournament_rows(self,ts):
-        if not ts:self.cv.addWidget(label('No tournaments yet. Create one to get started.','muted'));return
-        for i,t in enumerate(reversed(ts)):
-            if i:self.cv.addSpacing(12)
-            card=QFrame();card.setObjectName('surface');card.setMinimumHeight(82);r=layout_row(card,18,(20,14,20,14))
-            info=QWidget();v=layout_col(info,5);v.addWidget(label(t['name'],'subheading'));v.addWidget(label(f"{self.date_label(t)}  ·  {t['format']}  ·  {t['status']}",'muted'));r.addWidget(info,1)
-            r.addWidget(button('Open tournament  →',lambda _,id=t['id']:self.open_t(id)));self.cv.addWidget(card)
+        self.header('TOURNAMENTS','TOURNAMENT MANAGEMENT / ALL EVENTS',('+ NEW TOURNAMENT',self.create))
+        controls=QWidget();cr=layout_row(controls,10)
+        search=QLineEdit();search.setPlaceholderText('SEARCH TOURNAMENTS...')
+        cr.addWidget(search,1)
+        cr.addWidget(button('RECENTLY DELETED / RESTORE',self.restore_tournament))
+        self.cv.addWidget(controls)
+        count=label('','muted');self.cv.addWidget(count)
+        holder=QWidget();rows_layout=layout_col(holder,8)
+        self.cv.addWidget(holder,1)
+
+        def refresh():
+            while rows_layout.count():
+                item=rows_layout.takeAt(0)
+                if item.widget():item.widget().deleteLater()
+            tournaments=[t for t in reversed(self.data['tournaments'])
+                         if search.text().strip().lower() in
+                         (t.get('name','')+' '+t.get('format','')+' '+t.get('status','')).lower()]
+            count.setText(f'{len(tournaments)} / {len(self.data["tournaments"])} TOURNAMENTS')
+            if not tournaments:
+                rows_layout.addWidget(label('NO MATCHING TOURNAMENTS','muted'))
+            else:
+                self.tournament_rows(tournaments,rows_layout)
+            rows_layout.addStretch()
+        search.textChanged.connect(refresh)
+        refresh()
+
+    def tournament_rows(self,ts,target=None):
+        target=target or self.cv
+        if not ts:
+            target.addWidget(label('No tournaments yet. Create one to get started.','muted'))
+            return
+        for t in ts:
+            card=QFrame();card.setObjectName('surface')
+            r=layout_row(card,12,(15,12,15,12))
+            info=QWidget();v=layout_col(info,5)
+            v.addWidget(label(t.get('name','UNTITLED').upper(),'subheading'))
+            v.addWidget(label(f"{self.date_label(t)}  /  {t.get('format','')}  /  {t.get('status','')}",'muted'))
+            r.addWidget(info,1)
+            r.addWidget(button('OPEN TOURNAMENT  →',
+                               lambda checked=False,tid=t['id']:self.open_t(tid)))
+            target.addWidget(card)
+
     def delete_tournament(self):
         t=self.t()
         if not t:return
@@ -595,22 +626,40 @@ class Window(QMainWindow):
     def table(self,headers):
         table=QTableWidget(0,len(headers));table.setHorizontalHeaderLabels(headers);table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.setAlternatingRowColors(True);table.verticalHeader().hide();return table
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.setAlternatingRowColors(True);table.verticalHeader().hide();table.verticalHeader().setDefaultSectionSize(32);table.setShowGrid(False);return table
     def fill_table(self,table,rows):
         table.setRowCount(len(rows))
         for i,row in enumerate(rows):
             for j,value in enumerate(row):table.setItem(i,j,QTableWidgetItem(str(value)))
     def players_page(self):
-        self.header('Players','Permanent player profiles, Discord mappings and tournament history')
-        search=QLineEdit();search.setPlaceholderText('Search player, Arena ID, Discord ID or team…');self.cv.addWidget(search)
-        table=self.table(['Player','Arena ID','Discord ID','Most recent team','Appearances']);self.cv.addWidget(table,1)
+        self.header('PLAYERS','PLAYER DIRECTORY / DISCORD MAPPINGS / TOURNAMENT HISTORY')
+        records=self.player_records()
+        metrics=QWidget();mr=layout_row(metrics,10)
+        for heading,value in [('TOTAL PLAYERS',len(records)),
+                              ('DISCORD LINKED',sum(bool(rec.get('discord_id')) for rec in records.values())),
+                              ('WITH APPEARANCES',sum(bool(rec.get('appearances')) for rec in records.values()))]:
+            panel=QFrame();panel.setObjectName('surface')
+            panel_col=layout_col(panel,5,(14,12,14,12))
+            panel_col.addWidget(label(heading,'muted'))
+            metric=label(str(value),'heading');metric.setStyleSheet('font-size:25px;color:#58dc00;font-weight:700;')
+            panel_col.addWidget(metric)
+            mr.addWidget(panel,1)
+        self.cv.addWidget(metrics)
+        self.cv.addSpacing(10)
+        search=QLineEdit();search.setPlaceholderText('SEARCH PLAYER, ARENA ID, DISCORD ID OR TEAM...')
+        self.cv.addWidget(search)
+        count=label('','muted');self.cv.addWidget(count)
+        table=self.table(['PLAYER','ARENA ID','DISCORD ID','MOST RECENT TEAM','APPEARANCES'])
+        self.cv.addWidget(table,1)
         def refresh():
             records=self.player_records();rows=[];ids=[]
             for uid,rec in sorted(records.items(),key=lambda x:x[1].get('name','').lower()):
                 team=rec['appearances'][-1][1] if rec['appearances'] else '—'
                 row=[rec.get('name',''),uid,rec.get('discord_id',''),team,len(rec['appearances'])]
-                if search.text().lower() in ' '.join(map(str,row)).lower():rows.append(row);ids.append(uid)
+                if search.text().lower() in ' '.join(map(str,row)).lower():
+                    rows.append(row);ids.append(uid)
             self.fill_table(table,rows);table.setProperty('ids',ids)
+            count.setText(f'{len(rows)} / {len(records)} PLAYERS')
         search.textChanged.connect(refresh);refresh()
         def open_profile():
             idx=table.currentRow();ids=table.property('ids') or []
