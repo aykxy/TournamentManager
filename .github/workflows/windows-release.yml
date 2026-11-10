@@ -23,7 +23,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
+          python -m pip install -r requirements.txt pyinstaller pillow
       - name: Check Python source
         shell: pwsh
         run: python -m py_compile main.py updater.py
@@ -32,10 +32,14 @@ jobs:
         run: |
           if (-not (Test-Path tests)) { throw 'Missing tests/ directory: upload the tests before building.' }
           python -m unittest discover -s tests -v
+      - name: Prepare Windows application icon
+        shell: pwsh
+        run: |
+          python -c "from PIL import Image; image=Image.open('assets/arena_logo.png').convert('RGBA'); image.save('assets/arena_logo.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
       - name: Build Arena Tournament Manager
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --add-data "assets/arena_logo.png;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater --hidden-import notifications --hidden-import backup_manager --hidden-import team_reconciliation --hidden-import overview_logic main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.png;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater --hidden-import notifications --hidden-import backup_manager --hidden-import team_reconciliation --hidden-import overview_logic main.py
       - name: Build standalone updater
         shell: pwsh
         run: |
