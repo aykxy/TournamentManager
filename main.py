@@ -641,25 +641,54 @@ class Window(QMainWindow):
             v.addWidget(button('Save profile',save_profile,True));d.exec()
         table.cellDoubleClicked.connect(lambda *_:open_profile());self.cv.addWidget(button('Open selected player',open_profile))
     def teams_page(self):
-        self.header('Teams','Permanent team identities, rosters and transfer windows',('+ Transfer window',self.new_transfer_window))
-        top=QWidget();r=layout_row(top);r.addWidget(button('Manage transfers',self.manage_transfers));r.addStretch();self.cv.addWidget(top)
+        self.header('TEAMS','PERMANENT TEAM IDENTITIES / ROSTERS / TRANSFER WINDOWS',
+                    ('+ TRANSFER WINDOW',self.new_transfer_window))
         db=self.data.setdefault('teams_db',{})
-        table=self.table(['Team','Permanent ID','Current roster','Previous names'])
-        rows=[];ids=[]
-        for tid,rec in sorted(db.items(),key=lambda item:item[1].get('name','').lower()):
-            roster=[self.data['players'].get(str(uid),{}).get('name',str(uid)) for uid in rec.get('roster',[])]
-            rows.append([rec['name'],tid,', '.join(roster),', '.join(rec.get('names',[])[:-1]) or '—']);ids.append(tid)
-        self.fill_table(table,rows);self.cv.addWidget(table,1)
+        toolbar=QWidget();toolbar_row=layout_row(toolbar,10)
+        search=QLineEdit();search.setPlaceholderText('SEARCH TEAMS OR PLAYERS...')
+        toolbar_row.addWidget(search,1)
+        toolbar_row.addWidget(button('MANAGE TRANSFERS',self.manage_transfers))
+        self.cv.addWidget(toolbar)
+        self.cv.addSpacing(10)
+        summary=label(f'{len(db)} REGISTERED TEAMS','muted')
+        self.cv.addWidget(summary)
+        table=self.table(['TEAM','PERMANENT ID','CURRENT ROSTER','PREVIOUS NAMES'])
+        self.cv.addWidget(table,1)
+        selected_ids=[]
+
+        def refresh():
+            rows=[];selected_ids.clear()
+            query=search.text().strip().lower()
+            for tid,rec in sorted(db.items(),key=lambda item:item[1].get('name','').lower()):
+                roster=[self.data['players'].get(str(uid),{}).get('name',str(uid))
+                        for uid in rec.get('roster',[])]
+                row=[rec.get('name',''),tid,', '.join(roster),
+                     ', '.join(rec.get('names',[])[:-1]) or '—']
+                if query and query not in ' '.join(map(str,row)).lower():
+                    continue
+                rows.append(row);selected_ids.append(tid)
+            self.fill_table(table,rows)
+            summary.setText(f'{len(rows)} / {len(db)} REGISTERED TEAMS')
+
         def rename():
             i=table.currentRow()
-            if i<0:return
-            rec=db[ids[i]]
+            if i<0 or i>=len(selected_ids):
+                QMessageBox.information(self,'Select team','Select a team to rename first.')
+                return
+            rec=db[selected_ids[i]]
             name,ok=QInputDialog.getText(self,'Rename team','New team name:',text=rec['name'])
             if ok and name.strip() and name.strip()!=rec['name']:
                 rec.setdefault('names',[]).append(name.strip());rec['name']=name.strip()
-                rec.setdefault('history',[]).append({'at':datetime.datetime.now().isoformat(),'action':'rename','name':name.strip()})
+                rec.setdefault('history',[]).append(
+                    {'at':datetime.datetime.now().isoformat(),'action':'rename','name':name.strip()})
                 if self.save():self.render()
-        self.cv.addWidget(button('Rename selected team',rename))
+
+        search.textChanged.connect(refresh)
+        refresh()
+        actions=QWidget();ar=layout_row(actions,10)
+        ar.addStretch()
+        ar.addWidget(button('RENAME SELECTED TEAM',rename))
+        self.cv.addWidget(actions)
 
     def new_transfer_window(self):
         d=QDialog(self);d.setWindowTitle('Create transfer window');d.resize(440,360)
