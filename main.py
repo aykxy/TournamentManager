@@ -1055,6 +1055,12 @@ class Window(QMainWindow):
         t['status']='Finished';self.save();self.render()
 
 if __name__=='__main__':
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('TournamentManager.Desktop')
+        except (AttributeError, OSError):
+            pass
     app=QApplication(sys.argv);app.setStyle('Fusion');app.setStyleSheet(STYLE)
     try:win=Window()
     except Exception as e:
