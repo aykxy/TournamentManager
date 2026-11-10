@@ -27,10 +27,13 @@ jobs:
       - name: Check Python source
         shell: pwsh
         run: python -m py_compile main.py updater.py
+      - name: Run automated tests
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
       - name: Build Arena Tournament Manager
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --add-data "assets/arena_logo.png;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --add-data "assets/arena_logo.png;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater --hidden-import notifications --hidden-import backup_manager --hidden-import team_reconciliation --hidden-import overview_logic main.py
       - name: Build standalone updater
         shell: pwsh
         run: |
