@@ -36,10 +36,16 @@ jobs:
         shell: pwsh
         run: |
           python -c "from PIL import Image; image=Image.open('assets/arena_logo.png').convert('RGBA'); image.save('assets/arena_logo.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+      - name: Prepare licensed UI font
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/PixelifySans%5Bwght%5D.ttf" -OutFile "assets/PixelifySans.ttf"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/OFL.txt" -OutFile "assets/PixelifySans-OFL.txt"
+          if ((Get-Item "assets/PixelifySans.ttf").Length -lt 10000) { throw 'UI font download failed' }
       - name: Build Arena Tournament Manager
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.png;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater --hidden-import notifications --hidden-import backup_manager --hidden-import team_reconciliation --hidden-import overview_logic main.py
+          pyinstaller --noconfirm --clean --onedir --windowed --name ArenaTournamentManager --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.png;assets" --add-data "assets/PixelifySans.ttf;assets" --add-data "assets/PixelifySans-OFL.txt;assets" --collect-all PySide6.QtWebEngineWidgets --hidden-import updater --hidden-import notifications --hidden-import backup_manager --hidden-import team_reconciliation --hidden-import overview_logic main.py
       - name: Build standalone updater
         shell: pwsh
         run: |
