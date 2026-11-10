@@ -171,7 +171,7 @@ class Window(QMainWindow):
         self.content=QWidget();self.cv=layout_col(self.content,0,(32,26,32,26));root.addWidget(self.content,1)
         self.render()
         if self.reconcile_ambiguous:
-            QTimer.singleShot(100,lambda:QMessageBox.warning(self,'Team reconciliation needs review','These team names could not be matched safely and were left unchanged:\\n'+', '.join(self.reconcile_ambiguous)))
+            QTimer.singleShot(100,lambda:QMessageBox.warning(self,'Team reconciliation needs review','These team names could not be matched safely and were left unchanged:\n'+', '.join(self.reconcile_ambiguous)))
         QTimer.singleShot(1600,self.check_updates_background)
         self.tray = QSystemTrayIcon(self.windowIcon() if not self.windowIcon().isNull() else self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation), self)
         if QSystemTrayIcon.isSystemTrayAvailable():self.tray.show()
@@ -377,7 +377,7 @@ class Window(QMainWindow):
         dlg=QDialog(self);dlg.setWindowTitle('Delete tournament');dlg.resize(490,300)
         v=layout_col(dlg,14,(24,24,24,24))
         v.addWidget(label('Move tournament to Recently Deleted','subheading'))
-        v.addWidget(label(f"You're deleting: {t['name']}\\n\\nThis removes it from active tournament lists, but retains its record for recovery. Permanent players and teams are not deleted.",'muted'))
+        v.addWidget(label(f"You're deleting: {t['name']}\n\nThis removes it from active tournament lists, but retains its record for recovery. Permanent players and teams are not deleted.",'muted'))
         v.addWidget(label('Type DELETE to continue','muted'))
         typed=QLineEdit();typed.setPlaceholderText('DELETE');v.addWidget(typed)
         ack=QCheckBox('I understand and explicitly authorise deleting this tournament.');v.addWidget(ack)
@@ -756,7 +756,7 @@ class Window(QMainWindow):
             if not p.get('key'):
                 QMessageBox.warning(self,'Missing key','Import stream keys first.');return
             k=p['key']
-            QApplication.clipboard().setText(f"Hi {self.display_player_name(p)},\\n\\nYour Arena tournament stream details:\\n\\nStream / publish URL: {k['publish']}\\nPreview URL: {k['preview']}\\n\\nPlease keep your stream key private.")
+            QApplication.clipboard().setText(f"Hi {self.display_player_name(p)},\n\nYour Arena tournament stream details:\n\nStream / publish URL: {k['publish']}\nPreview URL: {k['preview']}\n\nPlease keep your stream key private.")
             QMessageBox.information(self,'Copied','Private DM copied. Confirm sent only after sending it.')
         def bulk_sent(mark):
             selected=selected_players()
@@ -767,9 +767,9 @@ class Window(QMainWindow):
             if not eligible:
                 QMessageBox.information(self,'Nothing to change',f'No eligible player statuses to update. {missing} selected players have no assigned key.');return
             action='Mark as sent' if mark else 'Mark as not sent'
-            message=(f'{action} for {len(eligible)} selected player(s)?\\n\\n'
-                     + ('Only confirm this after actually sending their individual Discord DMs.\\n' if mark else 'This will reset their sent confirmations.\\n')
-                     + (f'\\n{missing} player(s) without assigned keys will be skipped.' if missing else ''))
+            message=(f'{action} for {len(eligible)} selected player(s)?\n\n'
+                     + ('Only confirm this after actually sending their individual Discord DMs.\n' if mark else 'This will reset their sent confirmations.\n')
+                     + (f'\n{missing} player(s) without assigned keys will be skipped.' if missing else ''))
             if QMessageBox.question(self,'Confirm bulk DM status',message,QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes:return
             previous=[(p,bool(p.get('sent'))) for p in eligible]
             for p in eligible:p['sent']=mark
@@ -901,7 +901,7 @@ class Window(QMainWindow):
             QMessageBox.information(self,'No update','No update is currently available.');return
         if not getattr(sys,'frozen',False):
             QMessageBox.warning(self,'Packaged application required','One-click updates are supported in the installed Windows EXE. Source-mode users should update via GitHub.');return
-        if QMessageBox.question(self,'Install update',f"Install version {info['version']}?\\n\\n{info.get('notes','')[:1500]}\\n\\nThe application will restart. Your database is stored separately and will be preserved.")!=QMessageBox.StandardButton.Yes:return
+        if QMessageBox.question(self,'Install update',f"Install version {info['version']}?\n\n{info.get('notes','')[:1500]}\n\nThe application will restart. Your database is stored separately and will be preserved.")!=QMessageBox.StandardButton.Yes:return
 
         self.update_busy=True
         dialog=QDialog(self)
@@ -973,7 +973,7 @@ class Window(QMainWindow):
         if self.update_dialog is not None:
             self.update_dialog.close()
             self.update_dialog=None
-        QMessageBox.critical(self,'Update failed',message+'\\n\\nYour current installation has not been replaced.')
+        QMessageBox.critical(self,'Update failed',message+'\n\nYour current installation has not been replaced.')
 
     def settings_page(self):
         self.header('Settings & Updates','Local data, backups and software updates')
