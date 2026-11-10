@@ -14,7 +14,7 @@ BASE=Path.home()/'ArenaTournamentManager'; BASE.mkdir(exist_ok=True)
 DATA=BASE/'tournaments.json'
 ASSET=Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'assets'/'arena_logo.png'
 GREEN='#83e38b'
-VERSION='1.0.1'
+VERSION='1.0.2'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
 TASKS=[('announce','Announce tournament','manual'),('qopen','Announce qualifiers open','manual'),('qclose','Announce qualifiers closed','manual'),('received','Receive stream key document & tournament export from developer','manual'),('files','Upload stream key document & tournament export','auto'),('tickets','Add team players to their team ticket','manual'),('congrats','Send congratulations / acceptance and misc info','manual'),('guide','Send OBS guide in team tickets','manual'),('keys','DM stream keys to players','auto'),('bracket','Create bracket via Bracket HQ','manual'),('games','Create tournament games','manual'),('live','Announce tournament is live','manual'),('results','Record tournament results','manual')]
 STYLE='''
@@ -106,6 +106,9 @@ def layout_row(widget=None,spacing=10,margins=(0,0,0,0)):
 
 class UpdateSignals(QObject):
     found=Signal(dict)
+    progress=Signal(str,int,int)
+    staged=Signal(str)
+    failed=Signal(str)
 
 class NotificationSignals(QObject):
     failed=Signal(str)
@@ -150,7 +153,7 @@ class Window(QMainWindow):
         self.notification_signals=NotificationSignals()
         self.notification_signals.failed.connect(self.notification_failed)
         self.active=None;self.section='Overview';self.tab='Checklist'
-        self.update_info=None;self.update_signals=UpdateSignals();self.update_signals.found.connect(self.update_found)
+        self.update_info=None;self.update_busy=False;self.update_dialog=None;self.update_signals=UpdateSignals();self.update_signals.found.connect(self.update_found);self.update_signals.progress.connect(self.update_progress);self.update_signals.staged.connect(self.update_staged);self.update_signals.failed.connect(self.update_failed)
         self.setWindowTitle('Arena Tournament Manager');self.resize(1420,890);self.setMinimumSize(1050,680)
         if ASSET.exists():self.setWindowIcon(QIcon(str(ASSET)))
         shell=QWidget();shell.setObjectName("appRoot");self.setCentralWidget(shell);root=layout_row(shell,0)
@@ -891,25 +894,86 @@ class Window(QMainWindow):
         threading.Thread(target=worker,daemon=True).start()
 
     def install_update(self):
+        if self.update_busy:
+            return
         info=self.update_info
         if not info:
             QMessageBox.information(self,'No update','No update is currently available.');return
         if not getattr(sys,'frozen',False):
             QMessageBox.warning(self,'Packaged application required','One-click updates are supported in the installed Windows EXE. Source-mode users should update via GitHub.');return
-        if QMessageBox.question(self,'Install update',f"Install version {info['version']}?\n\n{info.get('notes','')[:1500]}\n\nThe application will restart. Your database is stored separately and will be preserved.")!=QMessageBox.StandardButton.Yes:return
+        if QMessageBox.question(self,'Install update',f"Install version {info['version']}?\\n\\n{info.get('notes','')[:1500]}\\n\\nThe application will restart. Your database is stored separately and will be preserved.")!=QMessageBox.StandardButton.Yes:return
+
+        self.update_busy=True
+        dialog=QDialog(self)
+        dialog.setWindowTitle('Updating Tournament Manager')
+        dialog.setModal(False)
+        dialog.setMinimumWidth(440)
+        dialog.setWindowFlag(Qt.WindowType.WindowCloseButtonHint,False)
+        v=layout_col(dialog,14,(24,24,24,24))
+        title=label('Installing version '+str(info['version']),'subheading')
+        v.addWidget(title)
+        self.update_status_label=label('Preparing download…','muted')
+        v.addWidget(self.update_status_label)
+        self.update_progress_bar=QProgressBar()
+        self.update_progress_bar.setRange(0,0)
+        v.addWidget(self.update_progress_bar)
+        self.update_detail_label=label('Please keep the application open until it restarts.','muted')
+        v.addWidget(self.update_detail_label)
+        self.update_dialog=dialog
+        dialog.show()
+
+        def worker():
+            try:
+                from updater import stage_update
+                def progress(stage, received, total):
+                    self.update_signals.progress.emit(stage,int(received),int(total or 0))
+                package=stage_update(info,BASE,progress=progress)
+                self.update_signals.staged.emit(str(package))
+            except Exception as exc:
+                self.update_signals.failed.emit(str(exc))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def update_progress(self,stage,received,total):
+        if not self.update_busy or self.update_dialog is None:
+            return
+        self.update_status_label.setText(stage+'…')
+        if stage=='Downloading' and total>0:
+            self.update_progress_bar.setRange(0,1000)
+            self.update_progress_bar.setValue(min(1000,int(received*1000/total)))
+            self.update_detail_label.setText(f'{received/1048576:.1f} MB / {total/1048576:.1f} MB  ·  {received*100//total}%')
+        else:
+            self.update_progress_bar.setRange(0,0)
+            if stage=='Verifying':
+                self.update_detail_label.setText('Checking the download and its integrity…')
+            elif stage=='Ready':
+                self.update_detail_label.setText('Preparing to restart…')
+
+    def update_staged(self,package):
+        if not self.update_busy:
+            return
+        self.update_status_label.setText('Installing and restarting…')
+        self.update_detail_label.setText('The application will close and reopen automatically.')
         try:
-            from updater import stage_update
-            package=stage_update(info,BASE)
             app_dir=Path(sys.executable).resolve().parent
             helper=app_dir/'ArenaUpdater.exe'
-            if not helper.exists():raise FileNotFoundError('ArenaUpdater.exe is missing from the installation')
+            if not helper.exists():
+                raise FileNotFoundError('ArenaUpdater.exe is missing from the installation')
             import tempfile
             temp_helper=Path(tempfile.mkdtemp(prefix='arena-updater-'))/'ArenaUpdater.exe'
             shutil.copy2(helper,temp_helper)
-            subprocess.Popen([str(temp_helper),'--apply',str(package),str(app_dir),str(os.getpid())],cwd=str(temp_helper.parent),creationflags=getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0))
+            subprocess.Popen([str(temp_helper),'--apply',str(package),str(app_dir),str(os.getpid())],
+                             cwd=str(temp_helper.parent),
+                             creationflags=getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0))
             QApplication.instance().quit()
-        except Exception as e:
-            QMessageBox.critical(self,'Update failed',str(e))
+        except Exception as exc:
+            self.update_failed(str(exc))
+
+    def update_failed(self,message):
+        self.update_busy=False
+        if self.update_dialog is not None:
+            self.update_dialog.close()
+            self.update_dialog=None
+        QMessageBox.critical(self,'Update failed',message+'\\n\\nYour current installation has not been replaced.')
 
     def settings_page(self):
         self.header('Settings & Updates','Local data, backups and software updates')
