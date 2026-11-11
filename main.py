@@ -833,7 +833,13 @@ class Window(QMainWindow):
         tree=QTreeWidget()
         tree.setHeaderLabels(['TOURNAMENT / TEAM','PLAYERS','ROSTER'])
         tree.setRootIsDecorated(True)
-        tree.setAlternatingRowColors(True)
+        tree.setAlternatingRowColors(False)
+        tree.setStyleSheet('QTreeWidget{background:#323234;alternate-background-color:#323234;'
+                           'color:#e8e8ec;border:1px solid #4a4a4f;}'
+                           'QTreeWidget::item{background:#323234;color:#e8e8ec;min-height:32px;}'
+                           'QTreeWidget::item:selected{background:#3a4b31;color:#ffffff;}'
+                           'QHeaderView::section{background:#29292b;color:#e8e8ec;'
+                           'border:0;border-bottom:1px solid #4a4a4f;padding:8px;}')
         tree.setIndentation(20)
         tree.header().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
         tree.header().setSectionResizeMode(1,QHeaderView.ResizeMode.ResizeToContents)
