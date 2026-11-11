@@ -362,7 +362,7 @@ class Window(QMainWindow):
             ec=layout_col(empty,10,(18,18,18,18))
             ec.addWidget(label('NO UPCOMING TOURNAMENTS','subheading'))
             ec.addWidget(label('Create a tournament to begin preparation.','muted'))
-            ec.addWidget(button('+ NEW TOURNAMENT',self.create,True))
+            # Creation is available in the page header; avoid a duplicate action.
             left_col.addWidget(empty)
         for item in items:
             t=item['tournament']
@@ -412,12 +412,6 @@ class Window(QMainWindow):
             lr.addWidget(number)
             sc.addWidget(line)
         right_col.addWidget(side)
-        shortcuts=QFrame();shortcuts.setObjectName('surface')
-        qc=layout_col(shortcuts,9,(15,15,15,15))
-        qc.addWidget(label('QUICK ACCESS','muted'))
-        for name,section in [('TOURNAMENTS','Tournaments'),('PLAYERS','Players'),('TEAMS','Teams')]:
-            qc.addWidget(button(name+'  →',lambda checked=False,target=section:self.navigate(target)))
-        right_col.addWidget(shortcuts)
         right_col.addStretch()
         body_row.addWidget(left,3)
         body_row.addWidget(right,1)
@@ -437,6 +431,7 @@ class Window(QMainWindow):
         cr.addWidget(search,1)
         cr.addWidget(button('RECENTLY DELETED / RESTORE',self.restore_tournament))
         self.cv.addWidget(controls)
+        self.cv.addSpacing(12)
         count=label('','muted');self.cv.addWidget(count)
         holder=QWidget();rows_layout=layout_col(holder,8)
         self.cv.addWidget(holder,1)
@@ -450,7 +445,7 @@ class Window(QMainWindow):
                          (t.get('name','')+' '+t.get('format','')+' '+t.get('status','')).lower()]
             count.setText(f'{len(tournaments)} / {len(self.data["tournaments"])} TOURNAMENTS')
             if not tournaments:
-                rows_layout.addWidget(label('NO MATCHING TOURNAMENTS','muted'))
+                rows_layout.addWidget(label('NO MATCHING TOURNAMENTS' if search.text().strip() else 'NO TOURNAMENTS YET','muted'))
             else:
                 self.tournament_rows(tournaments,rows_layout)
             rows_layout.addStretch()
