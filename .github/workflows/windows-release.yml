@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller pillow
+          python -m pip install -r requirements.txt pyinstaller==6.16.0 pillow==12.0.0
       - name: Check Python source
         shell: pwsh
         run: python -m py_compile main.py map_veto.py updater.py
@@ -51,8 +51,8 @@ jobs:
       - name: Build standalone updater
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --console --name ArenaUpdater updater.py
-          Copy-Item dist/ArenaUpdater.exe dist/ArenaTournamentManager/ArenaUpdater.exe
+          pyinstaller --noconfirm --clean --onedir --windowed --noupx --name ArenaUpdater updater.py
+          Copy-Item -Recurse dist/ArenaUpdater dist/ArenaTournamentManager/ArenaUpdater
       - name: Package and checksum
         shell: pwsh
         run: |
