@@ -48,12 +48,34 @@ class VetoTests(unittest.TestCase):
         self.assertEqual(len(picks),5)
         self.assertEqual([side_owner(v,a) for a in picks],[1,0,1,0,0])
 
-    def test_undo_reverts_last_map_and_side(self):
+    def test_undo_reverts_last_action_chronologically(self):
         v=self.create('BO3')
         for i in range(3):apply_map(v,str(i))
         apply_side(v,'2','RED')
         self.assertTrue(undo(v))
-        self.assertEqual(len(v['actions']),2)
+        self.assertEqual(len(v['actions']),3)  # Side selection was the latest action.
         self.assertNotIn('2',v['sides'])
+        self.assertTrue(undo(v))
+        self.assertEqual(len(v['actions']),2)  # Now undo the preceding map pick.
+
+    def test_undo_interleaved_side_and_map_actions(self):
+        v=self.create('BO3')
+        for i in range(3):apply_map(v,str(i))
+        apply_side(v,'2','RED')
+        apply_map(v,'3')
+        self.assertTrue(undo(v))  # Last action was the fourth map.
+        self.assertEqual(len(v['actions']),3)
+        self.assertEqual(v['sides']['2'],'RED')  # Earlier side choice is preserved.
+        self.assertTrue(undo(v))
+        self.assertNotIn('2',v['sides'])
+        self.assertEqual(len(v['actions']),3)
+
+    def test_undo_restores_previous_side_choice(self):
+        v=self.create('BO3')
+        for i in range(3):apply_map(v,str(i))
+        apply_side(v,'2','RED')
+        apply_side(v,'2','BLUE')
+        self.assertTrue(undo(v))
+        self.assertEqual(v['sides']['2'],'RED')
 
 if __name__=='__main__':unittest.main()
