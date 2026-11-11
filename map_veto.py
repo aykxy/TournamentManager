@@ -123,6 +123,12 @@ def label(text, muted=False):
     return w
 
 
+def section_heading(title):
+    heading=label(title)
+    heading.setStyleSheet('font-size:19px;font-weight:700;color:#f4f4f6;')
+    return heading
+
+
 def btn(text, callback, primary=False):
     w=QPushButton(text)
     if primary:w.setObjectName('primary')
@@ -350,11 +356,11 @@ class VetoPage:
         step=next_action(record)
         side=pending_side(record)
         if step:
-            lv.addWidget(label('STEP '+str(step['step'])+'/6  ·  '+record['teams'][step['team']].upper()+' — '+step['kind'].upper()+' A MAP'))
+            lv.addWidget(section_heading('STEP '+str(step['step'])+'/6  ·  '+record['teams'][step['team']].upper()+' — '+step['kind'].upper()+' A MAP'))
         elif record.get('completed'):
-            lv.addWidget(label('VETO COMPLETE — ALL SIDES CONFIRMED'))
+            lv.addWidget(section_heading('VETO COMPLETE — ALL SIDES CONFIRMED'))
         else:
-            lv.addWidget(label('MAP VETO COMPLETE — AWAITING SIDE PICKS'))
+            lv.addWidget(section_heading('MAP VETO COMPLETE — AWAITING SIDE PICKS'))
         grid=QWidget();g=QGridLayout(grid);g.setContentsMargins(0,0,0,0);g.setSpacing(9)
         actions={action['map_id']:action for action in record['actions']}
         decider=selected_maps(record)[-1] if not step else None
@@ -374,7 +380,7 @@ class VetoPage:
                 cv.addWidget(btn(step['kind'].upper(),select,True))
             g.addWidget(card,i//3,i%3)
         lv.addWidget(grid)
-        rv.addWidget(label('VETO HISTORY'))
+        rv.addWidget(section_heading('VETO HISTORY'))
         for i,action in enumerate(record['actions']):
             word='banned' if action['kind']=='ban' else 'picked'
             item=label(str(i+1)+'. '+record['teams'][action['team']]+' '+word+' '+name_of(record,action['map_id']))
@@ -387,7 +393,7 @@ class VetoPage:
             rv.addWidget(item)
         if side:
             owner=side_owner(record,side)
-            rv.addWidget(label('SIDE PICK — '+record['teams'][owner].upper()))
+            rv.addWidget(section_heading('SIDE PICK — '+record['teams'][owner].upper()))
             rv.addWidget(label(name_of(record,side['map_id'])+' · Other team gets opposite side.',True))
             map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
             rv.addWidget(image_label(map_rec.get('spawns'),340,155))
@@ -401,9 +407,9 @@ class VetoPage:
         # Once side picking is finished, show confirmed assignments in place
         # of the now-irrelevant pending side panel, not below its old position.
         if record.get('completed'):
-            rv.addWidget(label('CONFIRMED SIDES — FINAL'))
+            rv.addWidget(section_heading('CONFIRMED SIDES — FINAL'))
         else:
-            rv.addWidget(label('CONFIRMED SIDES'))
+            rv.addWidget(section_heading('CONFIRMED SIDES'))
         for action in selected_maps(record):
             chosen=record.get('sides',{}).get(action['map_id'])
             if chosen:
