@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont, QLinearGradient
 from PySide6.QtWidgets import (
     QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QLineEdit,
-    QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox
+    QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox,QTreeWidget,QTreeWidgetItem,QHeaderView
 )
 
 SEQUENCES = {
@@ -314,17 +314,66 @@ class VetoPage:
         self._clear_body();self.history_page_content()
 
     def history_page_content(self):
-        p,v=panel();v.addWidget(label('VETO HISTORY'))
+        p,v=panel()
+        v.addWidget(section_heading('VETO HISTORY'))
+        v.addWidget(label('Browse vetoes by tournament. Unlinked matches are shown separately.',True))
         records=list(reversed(self.data['map_vetoes']))
-        if not records:v.addWidget(label('No map vetoes recorded yet. Create your first veto to get started.',True))
+        if not records:
+            v.addWidget(label('No map vetoes recorded yet. Create your first veto to get started.',True))
+            self.w.cv.addWidget(p);self.w.cv.addStretch();return
+        tree=QTreeWidget()
+        tree.setHeaderLabels(['TOURNAMENT / MATCH','FORMAT','STATUS','ACTIONS'])
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(False)
+        tree.setIndentation(20)
+        tree.setStyleSheet('QTreeWidget{background:#323234;alternate-background-color:#323234;'
+                           'color:#e8e8ec;border:1px solid #4a4a4f;}'
+                           'QTreeWidget::item{background:#323234;color:#e8e8ec;min-height:38px;}'
+                           'QTreeWidget::item:selected{background:#3a4b31;color:#ffffff;}'
+                           'QHeaderView::section{background:#29292b;color:#e8e8ec;'
+                           'border:0;border-bottom:1px solid #4a4a4f;padding:8px;}')
+        tree.header().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
+        tree.header().setSectionResizeMode(1,QHeaderView.ResizeMode.ResizeToContents)
+        tree.header().setSectionResizeMode(2,QHeaderView.ResizeMode.ResizeToContents)
+        tree.header().setSectionResizeMode(3,QHeaderView.ResizeMode.ResizeToContents)
+        groups={}
+        tournaments={str(t['id']):t for t in self.data.get('tournaments',[])}
         for record in records:
-            line=QWidget();r=QHBoxLayout(line);r.setContentsMargins(0,0,0,0)
-            state='COMPLETED' if record.get('completed') else 'IN PROGRESS'
-            r.addWidget(label('  VS  '.join(record['teams'])+'  ·  '+record['format']+'  ·  '+state),1)
-            r.addWidget(btn('OPEN',lambda checked=False,vid=record['id']:self.open_veto(vid)))
-            r.addWidget(btn('DELETE',lambda checked=False,vid=record['id']:self.delete_veto(vid)))
-            v.addWidget(line)
+            tid=record.get('tournament_id')
+            t=tournaments.get(str(tid)) if tid is not None else None
+            key=str(tid) if t else '__unlinked__'
+            groups.setdefault(key,[]).append(record)
+        for t in reversed(self.data.get('tournaments',[])):
+            key=str(t['id'])
+            if key not in groups:continue
+            kind='OFFICIAL' if t.get('locked',True) else 'UNOFFICIAL'
+            group=QTreeWidgetItem([kind+' · '+t.get('name','Unnamed tournament'),
+                                   '',str(len(groups[key]))+' VETOES',''])
+            tree.addTopLevelItem(group)
+            for record in groups[key]:
+                self._veto_history_row(tree,group,record)
+            group.setExpanded(True)
+        if '__unlinked__' in groups:
+            group=QTreeWidgetItem(['UNLINKED / PRACTICE MATCHES','',
+                                   str(len(groups['__unlinked__']))+' VETOES',''])
+            tree.addTopLevelItem(group)
+            for record in groups['__unlinked__']:
+                self._veto_history_row(tree,group,record)
+            group.setExpanded(True)
+        v.addWidget(tree)
         self.w.cv.addWidget(p);self.w.cv.addStretch()
+
+    def _veto_history_row(self,tree,parent,record):
+        state='COMPLETED' if record.get('completed') else 'IN PROGRESS'
+        row=QTreeWidgetItem(['  VS  '.join(record['teams']),record['format'],state,''])
+        parent.addChild(row)
+        controls=QWidget()
+        buttons=QHBoxLayout(controls)
+        buttons.setContentsMargins(4,2,4,2)
+        buttons.setSpacing(7)
+        buttons.addWidget(btn('OPEN',lambda checked=False,vid=record['id']:self.open_veto(vid)))
+        buttons.addWidget(btn('DELETE',lambda checked=False,vid=record['id']:self.delete_veto(vid)))
+        tree.setItemWidget(row,3,controls)
 
     def delete_veto(self,vid):
         record=next((v for v in self.data['map_vetoes'] if v['id']==vid),None)
