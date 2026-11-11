@@ -212,7 +212,7 @@ class VetoPage:
     def render(self):
         self.w.header('MAP VETO','SEVEN-MAP ROTATION / ADMIN CONTROLLED BANS & SIDE PICKS')
         tabs=QWidget();row=QHBoxLayout(tabs);row.setContentsMargins(0,0,0,0)
-        for name,callback in [('NEW VETO',self.new_page),('MAP POOL',self.pool_page),('VETO HISTORY',self.history_page)]:
+        for name,callback in [('NEW VETO',lambda checked=False:self.new_page()),('MAP POOL',self.pool_page),('VETO HISTORY',self.history_page)]:
             row.addWidget(btn(name,callback))
         row.addStretch();self.w.cv.addWidget(tabs);self.w.cv.addSpacing(13)
         self.history_page_content()
