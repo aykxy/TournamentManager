@@ -24,7 +24,7 @@ QLabel {background:transparent;border:none;}
 QFrame {background:transparent;}
 QFrame#sidebar {background:#323234;border-right:1px solid #49494c;}
 QFrame#surface {background:#323234;border:1px solid #3c3c40;border-radius:0px;}
-QFrame#task {background:#39393c;border-bottom:1px solid #454549;}
+QFrame#task {background:#303033;border-bottom:1px solid #424245;}
 QFrame#surface QLabel,QFrame#surface QWidget,QFrame#task QLabel,QFrame#task QWidget {background:transparent;}
 QProgressBar {background:#424246;border:0;border-radius:0px;height:7px;text-align:center;}
 QProgressBar::chunk {background:#53d900;border-radius:0px;}
@@ -47,6 +47,14 @@ QTableWidget {background:#2d2d30;alternate-background-color:#323235;border:1px s
 QHeaderView::section {background:#323235;color:#9c9ca5;padding:8px;border:0;border-bottom:1px solid #48484d;font-size:12px;font-weight:600;}
 QTableWidget::item {padding:5px;border-bottom:1px solid #3e3e42;}
 QTableWidget::item:selected {background:#3a4b31;color:#eaf4e4;}
+QTableWidget::item:focus {outline:0;border:0;border-bottom:1px solid #3e3e42;}
+QComboBox QAbstractItemView {background:#333336;color:#e8e8ec;border:1px solid #555559;selection-background-color:#3a4b31;selection-color:#ffffff;outline:0;}
+QComboBox QAbstractItemView::item {background:#333336;color:#e8e8ec;min-height:27px;padding:4px 8px;}
+QComboBox QAbstractItemView::item:selected {background:#3a4b31;color:#ffffff;}
+QComboBox::drop-down,QDateEdit::drop-down,QDateTimeEdit::drop-down {background:#39393c;border-left:1px solid #4a4a4f;width:23px;}
+QSpinBox::up-button,QSpinBox::down-button {background:#39393c;border-left:1px solid #4a4a4f;width:22px;}
+QSpinBox {padding-right:27px;}
+QComboBox:focus,QSpinBox:focus,QDateEdit:focus {outline:0;border:1px solid #606066;}
 QCheckBox {spacing:8px;background:transparent;}
 QScrollArea {border:0;background:transparent;}
 QTabWidget::pane {border:0;}
@@ -621,11 +629,11 @@ class Window(QMainWindow):
     def table(self,headers):
         table=QTableWidget(0,len(headers));table.setHorizontalHeaderLabels(headers);table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.setAlternatingRowColors(True);table.verticalHeader().hide();table.verticalHeader().setDefaultSectionSize(32);table.setShowGrid(False);return table
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.setAlternatingRowColors(True);table.verticalHeader().hide();table.verticalHeader().setDefaultSectionSize(32);table.setShowGrid(False);table.setFocusPolicy(Qt.FocusPolicy.NoFocus);table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter);return table
     def fill_table(self,table,rows):
         table.setRowCount(len(rows))
         for i,row in enumerate(rows):
-            for j,value in enumerate(row):table.setItem(i,j,QTableWidgetItem(str(value)))
+            for j,value in enumerate(row):item=QTableWidgetItem(str(value));item.setTextAlignment(Qt.AlignmentFlag.AlignCenter);table.setItem(i,j,item)
     def players_page(self):
         self.header('PLAYERS','PLAYER DIRECTORY / DISCORD MAPPINGS / TOURNAMENT HISTORY')
         records=self.player_records()
