@@ -134,9 +134,9 @@ class NotificationSignals(QObject):
 
 class TournamentDialog(QDialog):
     def __init__(self,parent=None):
-        super().__init__(parent);self.setWindowTitle('Create tournament');self.resize(470,530)
+        super().__init__(parent);self.setWindowTitle('Create tournament');self.resize(550,600)
         v=layout_col(self,14,(24,24,24,24));v.addWidget(label('Create tournament','heading'))
-        form=QFormLayout();form.setSpacing(14);v.addLayout(form)
+        form=QFormLayout();form.setSpacing(17);form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft);form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow);v.addLayout(form)
         self.name=QLineEdit();self.name.setPlaceholderText('e.g. Season 5 — Tournament 3');form.addRow('Name',self.name)
         self.format=QComboBox();self.format.addItems(['Facecheck 1v1','Facecheck 2v2','3v3','4v4','5v5']);self.format.setCurrentText('5v5');form.addRow('Format',self.format)
         self.main=QSpinBox();self.main.setRange(1,128);self.main.setValue(8);form.addRow('Main teams',self.main)
@@ -149,7 +149,7 @@ class TournamentDialog(QDialog):
         self.dates=[];self.dates_text=label('No dates added','muted');v.addWidget(self.dates_text)
         v.addWidget(button('Remove last date',self.remove_date));self.add_date()
         v.addStretch()
-        actions=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel);actions.accepted.connect(self.accept);actions.rejected.connect(self.reject);v.addWidget(actions)
+        actions=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel);actions.button(QDialogButtonBox.StandardButton.Ok).setText('CREATE TOURNAMENT');actions.button(QDialogButtonBox.StandardButton.Ok).setObjectName('primary');actions.accepted.connect(self.accept);actions.rejected.connect(self.reject);v.addWidget(actions)
     def add_date(self):
         d=self.date.date().toString('yyyy-MM-dd')
         if d not in self.dates:self.dates.append(d);self.dates.sort()
@@ -504,16 +504,33 @@ class Window(QMainWindow):
         deleted=self.data.setdefault('deleted_tournaments',[])
         if not deleted:
             QMessageBox.information(self,'Recently Deleted','No deleted tournaments to restore.');return
-        names=[f"{entry['tournament']['name']}  ({entry['deleted_at'][:10]})" for entry in deleted]
-        choice,ok=QInputDialog.getItem(self,'Restore tournament','Select tournament:',names,0,False)
-        if not ok:return
-        if self.protected_backup('restore_tournament') is False:return
-        idx=names.index(choice);entry=deleted.pop(idx);t=entry['tournament']
-        if any(str(x['id'])==str(t['id']) for x in self.data['tournaments']):
-            t['id']=max([int(x['id']) for x in self.data['tournaments']]+[0])+1
-        self.data['tournaments'].append(t)
-        self.data.setdefault('audit_log',[]).append({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'action':'tournament_restored','tournament_id':t['id']})
-        if self.save():self.open_t(t['id'])
+        dlg=QDialog(self);dlg.setWindowTitle('Recently Deleted');dlg.resize(590,440)
+        col=layout_col(dlg,12,(22,22,22,22))
+        col.addWidget(label('RECENTLY DELETED','heading'))
+        col.addWidget(label('Restore a deleted tournament to your active tournament list.','muted'))
+        scroll=QScrollArea();scroll.setWidgetResizable(True)
+        container=QWidget();items=layout_col(container,9)
+        for entry in reversed(list(deleted)):
+            panel=QFrame();panel.setObjectName('surface');row=layout_row(panel,12,(14,12,14,12))
+            info=QWidget();iv=layout_col(info,4)
+            iv.addWidget(label(entry['tournament'].get('name','Untitled'),'subheading'))
+            iv.addWidget(label('DELETED '+entry.get('deleted_at','')[:10],'muted'))
+            row.addWidget(info,1)
+            def restore(checked=False,record=entry):
+                if self.protected_backup('restore_tournament') is False:return
+                if record not in deleted:return
+                t=record['tournament']
+                if any(str(x['id'])==str(t['id']) for x in self.data['tournaments']):
+                    t['id']=max([int(x['id']) for x in self.data['tournaments']]+[0])+1
+                deleted.remove(record);self.data['tournaments'].append(t)
+                self.data.setdefault('audit_log',[]).append(
+                    {'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                     'action':'tournament_restored','tournament_id':t['id']})
+                if self.save():dlg.accept();self.open_t(t['id'])
+            row.addWidget(button('RESTORE',restore,True));items.addWidget(panel)
+        items.addStretch();scroll.setWidget(container);col.addWidget(scroll,1)
+        footer=QWidget();fr=layout_row(footer,8);fr.addStretch();fr.addWidget(button('CLOSE',dlg.reject));col.addWidget(footer)
+        dlg.exec()
 
     def create(self):
         d=TournamentDialog(self)
@@ -745,14 +762,17 @@ class Window(QMainWindow):
         self.cv.addWidget(actions)
 
     def new_transfer_window(self):
-        d=QDialog(self);d.setWindowTitle('Create transfer window');d.resize(440,360)
-        v=layout_col(d,12,(22,22,22,22));v.addWidget(label('New transfer window','subheading'))
+        d=QDialog(self);d.setWindowTitle('Create transfer window');d.resize(540,440)
+        v=layout_col(d,12,(24,24,24,24));v.addWidget(label('CREATE TRANSFER WINDOW','heading'))
+        v.addWidget(label('Configure when teams can make roster changes.','muted'))
+        v.addWidget(label('WINDOW NAME'))
         name=QLineEdit();name.setPlaceholderText('e.g. Season 5 Transfer Window');v.addWidget(name)
-        v.addWidget(label('Maximum replacements per team (0 = unlimited)','muted'))
+        v.addWidget(label('MAXIMUM REPLACEMENTS PER TEAM'))
         limit=QSpinBox();limit.setRange(0,100);limit.setValue(2);v.addWidget(limit)
-        v.addWidget(label('Start date','muted'));start=QDateEdit(QDate.currentDate());start.setCalendarPopup(True);start.setDisplayFormat('dd-MM-yyyy');v.addWidget(start)
-        v.addWidget(label('End date','muted'));end=QDateEdit(QDate.currentDate().addDays(7));end.setCalendarPopup(True);end.setDisplayFormat('dd-MM-yyyy');v.addWidget(end)
-        b=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel);b.accepted.connect(d.accept);b.rejected.connect(d.reject);v.addWidget(b)
+        v.addWidget(label('Set to 0 for unlimited replacements.','muted'))
+        v.addWidget(label('START DATE'));start=QDateEdit(QDate.currentDate());start.setCalendarPopup(True);start.setDisplayFormat('dd-MM-yyyy');v.addWidget(start)
+        v.addWidget(label('END DATE'));end=QDateEdit(QDate.currentDate().addDays(7));end.setCalendarPopup(True);end.setDisplayFormat('dd-MM-yyyy');v.addWidget(end)
+        b=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel);b.button(QDialogButtonBox.StandardButton.Ok).setText('CREATE WINDOW');b.button(QDialogButtonBox.StandardButton.Ok).setObjectName('primary');b.accepted.connect(d.accept);b.rejected.connect(d.reject);v.addWidget(b)
         if d.exec()!=QDialog.DialogCode.Accepted:return
         if not name.text().strip() or start.date()>end.date():QMessageBox.warning(self,'Invalid window','Enter a name and valid dates.');return
         self.data.setdefault('transfer_windows',[]).append({'id':str(uuid.uuid4()),'name':name.text().strip(),'limit':limit.value(),'start':start.date().toString('yyyy-MM-dd'),'end':end.date().toString('yyyy-MM-dd'),'open':True,'changes':[]})
@@ -898,8 +918,8 @@ class Window(QMainWindow):
         self.fill_table(table,[[team['name']+(' [SUB]' if team.get('sub') else ''),self.display_player_name(p),p['arena_id'],p.get('discord_id',''),'Assigned' if p.get('key') else 'Missing','Sent' if p.get('sent') else 'Pending'] for team,p in players])
         self.cv.addWidget(table,1)
         # Keep the bulk-action toolbar visually separate from the player table.
-        self.cv.addSpacing(18)
-        actions=QWidget();r=layout_row(actions)
+        self.cv.addSpacing(12)
+        actions=QFrame();actions.setObjectName('surface');r=layout_col(actions,8,(12,10,12,10))
         def selected_players():
             return [players[i][1] for i in sorted({index.row() for index in table.selectedIndexes()}) if 0<=i<len(players)]
         def single_player():
@@ -949,17 +969,20 @@ class Window(QMainWindow):
             if not cmds:QMessageBox.warning(self,'No keys','Import keys first.');return
             QApplication.clipboard().setText(separator.join(cmds))
             QMessageBox.information(self,'Copied',f'{len(cmds)} admin-only commands copied.')
-        for text,callback in [
-            ('Select all',table.selectAll),
-            ('Clear selection',table.clearSelection),
-            ('Mark selected as sent',lambda:bulk_sent(True)),
-            ('Mark selected as not sent',lambda:bulk_sent(False)),
-            ('Copy player DM',copy_dm),
-            ('Edit Discord ID',discord_id),
-            ('Copy commands (comma-separated)',lambda:commands(', ')),
-            ('Copy commands (one per line)',lambda:commands('\n'))
-        ]:r.addWidget(button(text,callback))
-        r.addStretch();self.cv.addWidget(actions)
+        for heading,entries in [
+            ('SELECTION',[('Select all',table.selectAll),('Clear selection',table.clearSelection)]),
+            ('PLAYER ACTIONS',[('Mark selected as sent',lambda:bulk_sent(True)),
+                               ('Mark selected as not sent',lambda:bulk_sent(False)),
+                               ('Edit Discord ID',discord_id)]),
+            ('COPY & EXPORT',[('Copy player DM',copy_dm),
+                             ('Copy commands (comma-separated)',lambda:commands(', ')),
+                             ('Copy commands (one per line)',lambda:commands('\\n'))])
+        ]:
+            group=QWidget();gr=layout_row(group,8)
+            title=label(heading,'muted');title.setMinimumWidth(110);gr.addWidget(title)
+            for text,callback in entries:gr.addWidget(button(text,callback))
+            gr.addStretch();r.addWidget(group)
+        self.cv.addWidget(actions)
     def set_bracket(self):
         t=self.t();value,ok=QInputDialog.getText(self,'Bracket HQ link','Tournament bracket URL:',text=t.get('bracket_url',''))
         if not ok:return
