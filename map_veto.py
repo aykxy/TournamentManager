@@ -471,6 +471,24 @@ class VetoPage:
         heading,hv=panel()
         hv.addWidget(label('  VS  '.join(record['teams'])+'  |  '+record['format']))
         hv.addWidget(label('FIRST BAN: '+record['teams'][record['first']]+' (randomly selected)',True))
+        tournament=QComboBox()
+        tournament.addItem('UNLINKED / PRACTICE MATCH',None)
+        for t in reversed(self.data.get('tournaments',[])):
+            tournament.addItem(('OFFICIAL' if t.get('locked',True) else 'UNOFFICIAL')+
+                               ' · '+t.get('name','Unnamed tournament'),t['id'])
+        idx=tournament.findData(record.get('tournament_id'))
+        if idx>=0:tournament.setCurrentIndex(idx)
+        def relink(index):
+            previous=record.get('tournament_id')
+            record['tournament_id']=tournament.itemData(index)
+            if not self.save():
+                record['tournament_id']=previous
+                tournament.blockSignals(True)
+                tournament.setCurrentIndex(tournament.findData(previous))
+                tournament.blockSignals(False)
+        tournament.currentIndexChanged.connect(relink)
+        hv.addWidget(label('LINKED TOURNAMENT'))
+        hv.addWidget(tournament)
         self.w.cv.addWidget(heading)
         content=QWidget();columns=QHBoxLayout(content);columns.setContentsMargins(0,0,0,0);columns.setSpacing(14)
         left,lv=panel();right,rv=panel()
@@ -483,6 +501,11 @@ class VetoPage:
             lv.addWidget(section_heading('VETO COMPLETE — ALL SIDES CONFIRMED'))
         else:
             lv.addWidget(section_heading('MAP VETO COMPLETE — AWAITING SIDE PICKS'))
+        count=len(record['actions'])
+        chosen=len(record.get('sides',{}))
+        total={'BO1':1,'BO3':3,'BO5':5}[record['format']]
+        lv.addWidget(label('MAP ACTIONS: '+str(count)+'/6  ·  SIDES CONFIRMED: '+
+                           str(chosen)+'/'+str(total),True))
         grid=QWidget();g=QGridLayout(grid);g.setContentsMargins(0,0,0,0);g.setSpacing(9)
         actions={action['map_id']:action for action in record['actions']}
         decider=selected_maps(record)[-1] if not step else None
@@ -497,6 +520,10 @@ class VetoPage:
             cv.addWidget(state)
             if step and status=='AVAILABLE':
                 def select(checked=False,mid=m['id']):
+                    chosen_map=name_of(record,mid)
+                    choice=QMessageBox.question(self.w,'Confirm '+step['kind'].upper(),
+                        record['teams'][step['team']]+' — '+step['kind'].upper()+' '+chosen_map+'?')
+                    if choice!=QMessageBox.StandardButton.Yes:return
                     apply_map(record,mid)
                     if self.save():self.veto_page()
                 cv.addWidget(btn(step['kind'].upper(),select,True))
