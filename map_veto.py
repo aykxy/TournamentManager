@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QGuiApplication, QPainter
+from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont
 from PySide6.QtWidgets import (
     QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QLineEdit,
     QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox
@@ -363,40 +363,90 @@ class VetoPage:
         self.w.cv.addWidget(content,1)
 
     def copy_board(self,record):
-        # Render an independent, clean image instead of screenshotting the admin controls.
-        board=QWidget()
-        board.setStyleSheet('QWidget{background:#242426;color:#e8e8ec;font-family:Rajdhani;} QLabel{color:#e8e8ec;}')
-        v=QVBoxLayout(board);v.setContentsMargins(28,24,28,24);v.setSpacing(12)
-        heading=QLabel('ARENA  /  MAP VETO  /  '+record['format'])
-        heading.setStyleSheet('font-size:25px;font-weight:bold;color:#58dc00;')
-        v.addWidget(heading)
-        title=QLabel('  VS  '.join(record['teams']));title.setStyleSheet('font-size:23px;font-weight:bold;')
-        v.addWidget(title)
-        step=next_action(record);side=pending_side(record)
-        status='COMPLETE' if record.get('completed') else ('SIDE PICK: '+record['teams'][side_owner(record,side)] if side else ('TURN: '+record['teams'][step['team']]+' '+step['kind'].upper() if step else 'AWAITING SIDES'))
-        v.addWidget(QLabel(status))
-        for i,action in enumerate(selected_maps(record)):
-            m=next(m for m in record['pool'] if m['id']==action['map_id'])
-            card=QFrame();card.setStyleSheet('background:#323234;border:1px solid #48484b;')
-            row=QHBoxLayout(card)
-            preview=image_label(m.get('preview'),180,95);row.addWidget(preview)
-            info=QVBoxLayout();name=QLabel(str(i+1)+'.  '+m['name']);name.setStyleSheet('font-size:20px;font-weight:bold;')
-            info.addWidget(name)
-            info.addWidget(QLabel('DECIDER' if action['kind']=='decider' else 'PICKED BY '+record['teams'][action['team']]))
-            owner=side_owner(record,action);choice=record.get('sides',{}).get(action['map_id'])
-            if choice:
-                opposite='BLUE' if choice=='RED' else 'RED'
-                sides=QLabel(record['teams'][owner]+': '+choice+'  |  '+record['teams'][1-owner]+': '+opposite)
-                sides.setStyleSheet('font-size:15px;color:#58dc00;')
-                info.addWidget(sides)
-            else:info.addWidget(QLabel(record['teams'][owner]+' — SIDE PENDING'))
-            row.addLayout(info,1);v.addWidget(card)
-        banned=', '.join(name_of(record,a['map_id']) for a in record['actions'] if a['kind']=='ban')
-        v.addWidget(QLabel('BANNED: '+(banned or 'None yet')))
-        v.addWidget(QLabel('FIRST BAN: '+record['teams'][record['first']]))
-        board.setFixedWidth(850);board.adjustSize()
-        board.resize(850,max(board.sizeHint().height(),230))
-        pix=QPixmap(board.size());pix.fill(Qt.GlobalColor.transparent)
-        board.render(pix)
+        """Copy a player-facing veto board: all seven maps, history and pending side."""
+        from PySide6.QtCore import QRect, QRectF
+        width,height=1200,850
+        pix=QPixmap(width,height)
+        pix.fill(QColor('#242426'))
+        painter=QPainter(pix)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        def rect(x,y,w,h,fill):
+            painter.fillRect(QRect(x,y,w,h),QColor(fill))
+        def text(x,y,w,h,value,size=16,colour='#e8e8ec',bold=False):
+            font=QFont('Rajdhani',size)
+            font.setBold(bold)
+            painter.setFont(font)
+            painter.setPen(QColor(colour))
+            painter.drawText(QRect(x,y,w,h),Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter,
+                             str(value))
+        def picture(path,x,y,w,h):
+            rect(x,y,w,h,'#28282b')
+            if path and Path(path).is_file():
+                source=QPixmap(path)
+                if not source.isNull():
+                    scaled=source.scaled(w,h,Qt.AspectRatioMode.KeepAspectRatio,
+                                         Qt.TransformationMode.SmoothTransformation)
+                    painter.drawPixmap(x+(w-scaled.width())//2,y+(h-scaled.height())//2,scaled)
+                    return
+            text(x+10,y+10,w-20,h-20,'IMAGE PENDING',12,'#88888f')
+        text(28,14,1144,38,'ARENA  /  MAP VETO  /  '+record['format'],22,GREEN,True)
+        text(28,55,1144,43,'  VS  '.join(record['teams']),25,'#ffffff',True)
+        step=next_action(record)
+        side=pending_side(record)
+        if step:
+            status=record['teams'][step['team']]+' — '+step['kind'].upper()+' A MAP'
+        elif record.get('completed'):
+            status='VETO COMPLETE'
+        else:
+            status='MAP SELECTION COMPLETE — AWAITING SIDES'
+        rect(28,110,1144,45,'#394630')
+        text(42,114,1116,36,'CURRENT TURN: '+status,17,GREEN,True)
+        rect(28,170,745,642,'#323234')
+        rect(789,170,383,642,'#323234')
+        text(44,178,712,32,'ALL SEVEN MAPS',19,'#ffffff',True)
+        text(805,178,349,32,'VETO HISTORY',19,'#ffffff',True)
+        actions={action['map_id']:action for action in record['actions']}
+        picks=selected_maps(record)
+        decider=next((a for a in picks if a['kind']=='decider'),None)
+        for i,m in enumerate(record['pool']):
+            col,row=i%3,i//3
+            x=44+col*240;y=221+row*188
+            rect(x,y,228,175,'#29292c')
+            picture(m.get('preview'),x+8,y+8,212,113)
+            action=actions.get(m['id'])
+            state=('BANNED' if action['kind']=='ban' else 'PICKED') if action else (
+                'DECIDER' if decider and decider['map_id']==m['id'] else 'AVAILABLE')
+            colour={'BANNED':'#ff4556','PICKED':'#00d78a','DECIDER':'#00d78a',
+                    'AVAILABLE':'#e8e8ec'}[state]
+            text(x+9,y+122,210,27,m['name'],15,'#ffffff',True)
+            text(x+9,y+149,210,21,state,12,colour,True)
+        for i,action in enumerate(record['actions']):
+            colour='#ff4556' if action['kind']=='ban' else '#00d78a'
+            line=f"{i+1}. {record['teams'][action['team']]} {action['kind']} {name_of(record,action['map_id'])}"
+            text(805,216+i*31,353,29,line,13,colour)
+        if decider:
+            text(805,216+len(record['actions'])*31,353,29,
+                 '7. System picked '+name_of(record,decider['map_id']),13,'#00d78a')
+        side_y=450
+        rect(800,side_y,361,2,'#4a4a4e')
+        if side:
+            owner=side_owner(record,side)
+            text(805,side_y+10,349,31,'SIDE CHOICE: '+record['teams'][owner],17,GREEN,True)
+            text(805,side_y+43,349,25,name_of(record,side['map_id'])+' — RED or BLUE?',14,'#ffffff')
+            map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
+            picture(map_rec.get('spawns'),805,side_y+75,350,155)
+            text(805,side_y+237,350,26,'Other team receives the opposite side',12,'#aaaaaf')
+        else:
+            text(805,side_y+13,350,31,'NO PENDING SIDE CHOICE',15,'#aaaaaf',True)
+        text(805,side_y+274,350,26,'CONFIRMED SIDES',15,'#ffffff',True)
+        for i,action in enumerate(a for a in picks if a['map_id'] in record.get('sides',{})):
+            owner=side_owner(record,action)
+            chosen=record['sides'][action['map_id']]
+            text(805,side_y+305+i*25,350,24,
+                 name_of(record,action['map_id'])+': '+record['teams'][owner]+' '+chosen,
+                 12,GREEN)
+        painter.end()
         QGuiApplication.clipboard().setPixmap(pix)
-        QMessageBox.information(self.w,'Veto image copied','The veto board is on your clipboard. Paste it directly into Discord.')
+        QMessageBox.information(self.w,'Veto image copied',
+                                'The full seven-map board, action history and side selection are on your clipboard. Paste into Discord.')
