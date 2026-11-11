@@ -481,6 +481,19 @@ class VetoPage:
                 'DECIDER' if decider and decider['map_id']==m['id'] else 'AVAILABLE')
             colour={'BANNED':'#ff4556','PICKED':'#00d78a','DECIDER':'#00d78a',
                     'AVAILABLE':'#e8e8ec'}[state]
+            if state in ('BANNED','PICKED','DECIDER'):
+                glow=QColor(colour)
+                for x1,y1,x2,y2,area in (
+                    (x,y,x+26,y,(x,y,26,175)),
+                    (x+228,y,x+202,y,(x+202,y,26,175)),
+                    (x,y,x,y+26,(x,y,228,26)),
+                    (x,y+175,x,y+149,(x,y+149,228,26)),
+                ):
+                    gradient=QLinearGradient(x1,y1,x2,y2)
+                    outer=QColor(glow);outer.setAlpha(125)
+                    inner=QColor(glow);inner.setAlpha(0)
+                    gradient.setColorAt(0,outer);gradient.setColorAt(1,inner)
+                    painter.fillRect(QRect(*area),gradient)
             text(x+9,y+122,210,27,m['name'],15,'#ffffff',True)
             text(x+9,y+149,210,21,state,12,colour,True)
         for i,action in enumerate(record['actions']):
@@ -499,15 +512,20 @@ class VetoPage:
             map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
             picture(map_rec.get('spawns'),805,side_y+75,350,155)
             text(805,side_y+237,350,26,'Other team receives the opposite side',12,'#aaaaaf')
+            confirmed_y=side_y+274
         else:
-            text(805,side_y+13,350,31,'NO PENDING SIDE CHOICE',15,'#aaaaaf',True)
-        text(805,side_y+274,350,26,'CONFIRMED SIDES',15,'#ffffff',True)
+            # No empty side-choice panel: show the confirmed side assignments here.
+            confirmed_y=side_y+10
+        text(805,confirmed_y,350,28,
+             'CONFIRMED SIDES — FINAL' if record.get('completed') else 'CONFIRMED SIDES',
+             16,'#ffffff',True)
         for i,action in enumerate(a for a in picks if a['map_id'] in record.get('sides',{})):
             owner=side_owner(record,action)
             chosen=record['sides'][action['map_id']]
-            text(805,side_y+305+i*25,350,24,
-                 name_of(record,action['map_id'])+': '+record['teams'][owner]+' '+chosen,
-                 12,GREEN)
+            opposite='BLUE' if chosen=='RED' else 'RED'
+            text(805,confirmed_y+32+i*34,350,31,
+                 name_of(record,action['map_id'])+': '+record['teams'][owner]+' '+chosen+
+                 ' / '+record['teams'][1-owner]+' '+opposite,12,GREEN)
         painter.end()
         QGuiApplication.clipboard().setPixmap(pix)
         QMessageBox.information(self.w,'Veto image copied',
