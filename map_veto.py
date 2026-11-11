@@ -281,10 +281,22 @@ class VetoPage:
         b=QLineEdit();b.setPlaceholderText('TEAM B')
         v.addWidget(a);v.addWidget(b)
         fmt=QComboBox();fmt.addItems(['BO1','BO3','BO5']);v.addWidget(label('MATCH FORMAT'));v.addWidget(fmt)
-        tournament=QComboBox();tournament.addItem('Unlinked / practice match',None)
-        for t in reversed(self.data.get('tournaments',[])):
-            tournament.addItem(t['name'],t['id'])
-        v.addWidget(label('TOURNAMENT (OPTIONAL)'));v.addWidget(tournament)
+        tournament=QComboBox()
+        tournament.setMinimumWidth(360)
+        tournament.addItem('No tournament — standalone veto',None)
+        # The tournament database is shared with the main Tournaments page.
+        # Distinguish official (locked-roster) events from casual ones explicitly.
+        tournaments=list(reversed(self.data.get('tournaments',[])))
+        official=[t for t in tournaments if t.get('locked',True)]
+        casual=[t for t in tournaments if not t.get('locked',True)]
+        for title,events in (('OFFICIAL TOURNAMENTS',official),('OTHER TOURNAMENTS',casual)):
+            if not events:continue
+            tournament.insertSeparator(tournament.count())
+            for t in events:
+                tournament.addItem(title.split(' ')[0]+'  ·  '+str(t.get('name','Unnamed tournament')),t['id'])
+        v.addWidget(label('TOURNAMENT (OPTIONAL)'))
+        v.addWidget(tournament)
+        v.addWidget(label('Select an official tournament above, or leave this veto unlinked.',True))
         def start():
             ids=set(self.data['active_map_ids'])
             pool=[copy.deepcopy(m) for m in self.data['map_library'] if m['id'] in ids]
