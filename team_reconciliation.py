@@ -21,6 +21,8 @@ def reconcile_teams(data):
     changes = 0
     review = []
     for tournament in data.get('tournaments', []):
+        if not tournament.get('locked', True):
+            continue  # Casual tournament teams never create permanent identities.
         for team in tournament.get('teams', []):
             name = str(team.get('name', '')).strip()
             if not name:
@@ -63,6 +65,8 @@ def reconcile_teams(data):
         rec['names'] = list(dict.fromkeys([*rec.get('names', []), *local.get('names', []), local.get('name', '')]))
         rec.setdefault('history', []).append({'action': 'local_id_reconciled', 'previous_id': local_id, 'previous_record': deepcopy(local)})
         for t in data.get('tournaments', []):
+            if not t.get('locked', True):
+                continue
             for team in t.get('teams', []):
                 if team.get('team_id') == local_id:
                     team['team_id'] = target
