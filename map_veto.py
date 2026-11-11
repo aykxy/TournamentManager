@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont, QLinearGradient
 from PySide6.QtWidgets import (
     QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QLineEdit,
-    QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox,QTreeWidget,QTreeWidgetItem,QHeaderView
+    QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox,QTreeWidget,QTreeWidgetItem,QHeaderView,QGraphicsBlurEffect
 )
 
 SEQUENCES = {
@@ -361,6 +361,12 @@ class VetoPage:
         result.setStyleSheet('font-size:38px;font-weight:900;color:#f5f7f5;padding:24px;'
                              'background:#242c29;border:2px solid #4a6656;border-radius:12px;')
         layout.addWidget(result,1)
+        # A subtle blur during the rapid name changes suggests movement;
+        # it eases away as the draw slows, leaving the winner crisp.
+        motion_blur=QGraphicsBlurEffect(result)
+        motion_blur.setBlurHints(QGraphicsBlurEffect.BlurHint.AnimationHint)
+        motion_blur.setBlurRadius(0)
+        result.setGraphicsEffect(motion_blur)
         caption=label('SELECTING WHICH TEAM BANS FIRST')
         caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
         caption.setStyleSheet('font-size:16px;font-weight:700;color:#aab7ad;')
@@ -375,6 +381,7 @@ class VetoPage:
         def animate():
             index=frames['n']
             if index>=len(intervals):
+                motion_blur.setBlurRadius(0)
                 result.setText(record['teams'][record['first']].upper())
                 result.setStyleSheet('font-size:40px;font-weight:900;color:#a8ff86;padding:24px;'
                                      'background:#1e3529;border:2px solid #58dc00;border-radius:12px;')
@@ -382,6 +389,7 @@ class VetoPage:
                 caption.setText('THIS TEAM WILL BAN THE FIRST MAP')
                 QTimer.singleShot(3000,lambda:continue_button.setVisible(True))
                 return
+            motion_blur.setBlurRadius(max(0,4.5-index*0.42))
             result.setText(record['teams'][index%2].upper())
             frames['n']+=1
             QTimer.singleShot(intervals[index],animate)
