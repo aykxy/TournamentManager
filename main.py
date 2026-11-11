@@ -478,6 +478,7 @@ class Window(QMainWindow):
             tab=button(status,lambda checked=False,key=status:set_filter(key))
             filter_buttons[status]=tab;filter_row.addWidget(tab)
         filter_row.addStretch();self.cv.addWidget(filters)
+        self.cv.addSpacing(12)
         count=label('','muted');self.cv.addWidget(count)
         holder=QWidget();rows_layout=layout_col(holder,8)
         self.cv.addWidget(holder,1)
