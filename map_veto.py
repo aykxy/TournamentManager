@@ -5,7 +5,7 @@ import secrets
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont, QLinearGradient
 from PySide6.QtWidgets import (
     QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QLineEdit,
@@ -33,7 +33,7 @@ def new_veto(team_a, team_b, fmt, pool, tournament_id=None):
         'id': str(uuid.uuid4()), 'created': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'teams': [team_a.strip(), team_b.strip()], 'format': fmt,
         'first': secrets.randbelow(2), 'pool': copy.deepcopy(pool),
-        'tournament_id': tournament_id, 'actions': [], 'sides': {}, 'completed': False
+        'tournament_id': tournament_id, 'actions': [], 'sides': {}, 'completed': False, 'event_log': []
     }
 
 
@@ -84,6 +84,7 @@ def apply_map(veto, map_id):
         raise ValueError('All map actions are complete')
     if map_id not in {m['id'] for m in remaining(veto)}:
         raise ValueError('Map is not available')
+    veto.setdefault('event_log',[]).append({'kind':'map','map_id':map_id})
     veto['actions'].append({'kind': step['kind'], 'team': step['team'], 'map_id': map_id})
     veto['completed'] = False
 
@@ -93,18 +94,33 @@ def apply_side(veto, map_id, side):
         raise ValueError('Choose RED or BLUE')
     if map_id not in {a['map_id'] for a in selected_maps(veto)}:
         raise ValueError('This map has not been picked')
+    veto.setdefault('event_log',[]).append({'kind':'side','map_id':map_id,'previous':veto.get('sides',{}).get(map_id)})
     veto.setdefault('sides', {})[map_id] = side
     veto['completed'] = next_action(veto) is None and pending_side(veto) is None
 
 
 def undo(veto):
+    log=veto.get('event_log')
+    if log:
+        event=log.pop()
+        if event['kind']=='side':
+            previous=event.get('previous')
+            if previous is None:veto.setdefault('sides',{}).pop(event['map_id'],None)
+            else:veto.setdefault('sides',{})[event['map_id']]=previous
+        else:
+            if not veto['actions'] or veto['actions'][-1]['map_id']!=event['map_id']:
+                log.append(event);return False
+            veto['actions'].pop()
+            valid={a['map_id'] for a in selected_maps(veto)}
+            veto['sides']={k:v for k,v in veto.get('sides',{}).items() if k in valid}
+        veto['completed']=next_action(veto) is None and pending_side(veto) is None
+        return True
     if veto['actions']:
-        action = veto['actions'].pop()
-        veto.setdefault('sides', {}).pop(action['map_id'], None)
-        # The decider is recalculated after each action; remove obsolete side selection.
-        valid = {a['map_id'] for a in selected_maps(veto)}
-        veto['sides'] = {k:v for k,v in veto['sides'].items() if k in valid}
-        veto['completed'] = False
+        action=veto['actions'].pop()
+        veto.setdefault('sides',{}).pop(action['map_id'],None)
+        valid={a['map_id'] for a in selected_maps(veto)}
+        veto['sides']={k:v for k,v in veto['sides'].items() if k in valid}
+        veto['completed']=False
         return True
     return False
 
@@ -481,12 +497,8 @@ class VetoPage:
                                    record['teams'][1-owner]+': '+opposite))
         rv.addStretch()
         def undo_action():
-            if record.get('sides'):
-                last=next((a for a in reversed(selected_maps(record)) if a['map_id'] in record['sides']),None)
-                if last:
-                    record['sides'].pop(last['map_id'],None);record['completed']=False
-                    self.save();self.veto_page();return
-            if undo(record):self.save();self.veto_page()
+            if undo(record):
+                if self.save():self.veto_page()
         rv.addWidget(btn('UNDO LAST',undo_action))
         rv.addWidget(btn('COPY VETO IMAGE',lambda:self.copy_board(record),True))
         self.w.cv.addWidget(content,1)
