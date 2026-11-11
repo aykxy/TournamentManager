@@ -25,7 +25,7 @@ QFrame {background:transparent;}
 QFrame#sidebar {background:#323234;border-right:1px solid #49494c;}
 QFrame#surface {background:#323234;border:1px solid #3c3c40;border-radius:0px;}
 QFrame#task {background:#303033;border-bottom:1px solid #424245;}
-QFrame#surface QLabel,QFrame#surface QWidget,QFrame#task QLabel,QFrame#task QWidget {background:transparent;}
+QFrame#surface QLabel,QFrame#task QLabel {background:transparent;}
 QProgressBar {background:#424246;border:0;border-radius:0px;height:7px;text-align:center;}
 QProgressBar::chunk {background:#53d900;border-radius:0px;}
 QLabel#muted {color:#93939c;font-size:12px;}
