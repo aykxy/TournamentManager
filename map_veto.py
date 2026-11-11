@@ -286,61 +286,81 @@ class VetoPage:
         record=self._current()
         if not record:self.history_page();return
         self._clear_body()
-        p,v=panel()
-        v.addWidget(label('  VS  '.join(record['teams'])+'  ·  '+record['format']))
-        v.addWidget(label('FIRST BAN: '+record['teams'][record['first']]+'  (randomly selected)',True))
+        heading,hv=panel()
+        hv.addWidget(label('  VS  '.join(record['teams'])+'  |  '+record['format']))
+        hv.addWidget(label('FIRST BAN: '+record['teams'][record['first']]+' (randomly selected)',True))
+        self.w.cv.addWidget(heading)
+        content=QWidget();columns=QHBoxLayout(content);columns.setContentsMargins(0,0,0,0);columns.setSpacing(14)
+        left,lv=panel();right,rv=panel()
+        columns.addWidget(left,3);columns.addWidget(right,2)
         step=next_action(record)
         side=pending_side(record)
+        if step:
+            lv.addWidget(label('STEP '+str(step['step'])+'/6  ·  '+record['teams'][step['team']].upper()+' — '+step['kind'].upper()+' A MAP'))
+        elif record.get('completed'):
+            lv.addWidget(label('VETO COMPLETE — ALL SIDES CONFIRMED'))
+        else:
+            lv.addWidget(label('MAP VETO COMPLETE — AWAITING SIDE PICKS'))
+        grid=QWidget();g=QGridLayout(grid);g.setContentsMargins(0,0,0,0);g.setSpacing(9)
+        actions={action['map_id']:action for action in record['actions']}
+        decider=selected_maps(record)[-1] if not step else None
+        for i,m in enumerate(record['pool']):
+            action=actions.get(m['id'])
+            status=('BANNED' if action['kind']=='ban' else 'PICKED') if action else ('DECIDER' if decider and decider['map_id']==m['id'] else 'AVAILABLE')
+            card=QFrame();card.setObjectName('surface');cv=QVBoxLayout(card);cv.setSpacing(5)
+            cv.addWidget(image_label(m.get('preview'),190,105))
+            cv.addWidget(label(m['name']))
+            colour={'BANNED':'#ff4556','PICKED':'#00d78a','DECIDER':'#00d78a','AVAILABLE':'#bfc1c6'}[status]
+            state=label(status);state.setStyleSheet('color:'+colour+';font-weight:bold;')
+            cv.addWidget(state)
+            if step and status=='AVAILABLE':
+                def select(checked=False,mid=m['id']):
+                    apply_map(record,mid)
+                    if self.save():self.veto_page()
+                cv.addWidget(btn(step['kind'].upper(),select,True))
+            g.addWidget(card,i//3,i%3)
+        lv.addWidget(grid)
+        rv.addWidget(label('VETO HISTORY'))
+        for i,action in enumerate(record['actions']):
+            word='banned' if action['kind']=='ban' else 'picked'
+            item=label(str(i+1)+'. '+record['teams'][action['team']]+' '+word+' '+name_of(record,action['map_id']))
+            item.setStyleSheet('color:' + ('#ff4556' if word=='banned' else '#00d78a')+';')
+            rv.addWidget(item)
+        if not step:
+            dec=selected_maps(record)[-1]
+            item=label('7. System picked '+name_of(record,dec['map_id']))
+            item.setStyleSheet('color:#00d78a;')
+            rv.addWidget(item)
         if side:
             owner=side_owner(record,side)
-            v.addWidget(label('SIDE SELECTION — '+record['teams'][owner]+' CHOOSES RED OR BLUE'))
-            v.addWidget(label(name_of(record,side['map_id'])+' · The other team receives the opposite side.',True))
+            rv.addWidget(label('SIDE PICK — '+record['teams'][owner].upper()))
+            rv.addWidget(label(name_of(record,side['map_id'])+' · Other team gets opposite side.',True))
             map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
-            v.addWidget(image_label(map_rec.get('spawns'),780,320))
+            rv.addWidget(image_label(map_rec.get('spawns'),340,190))
             choices=QWidget();cr=QHBoxLayout(choices);cr.setContentsMargins(0,0,0,0)
             def choose_side(colour):
                 apply_side(record,side['map_id'],colour)
                 if self.save():self.veto_page()
-            cr.addWidget(btn('CHOOSE RED',lambda:choose_side('RED'),True))
-            cr.addWidget(btn('CHOOSE BLUE',lambda:choose_side('BLUE'),True))
-            v.addWidget(choices)
-        elif step:
-            v.addWidget(label('STEP '+str(step['step'])+' / 6  ·  '+record['teams'][step['team']].upper()+' — '+step['kind'].upper()+' A MAP'))
-            grid=QWidget();g=QGridLayout(grid);g.setContentsMargins(0,0,0,0)
-            for i,m in enumerate(remaining(record)):
-                card=QFrame();card.setObjectName('surface');cv=QVBoxLayout(card)
-                cv.addWidget(image_label(m.get('preview'),240,120))
-                cv.addWidget(label(m['name']))
-                def select(checked=False,mid=m['id']):
-                    apply_map(record,mid)
-                    if self.save():self.veto_page()
-                cv.addWidget(btn(step['kind'].upper()+' '+m['name'],select,True))
-                g.addWidget(card,i//3,i%3)
-            v.addWidget(grid)
-        else:
-            v.addWidget(label('VETO COMPLETE — ALL MAPS AND SIDES CONFIRMED'))
-        self.w.cv.addWidget(p)
-        results,rv=panel();rv.addWidget(label('MAP ORDER & SIDE ASSIGNMENTS'))
-        for i,action in enumerate(selected_maps(record)):
-            owner=side_owner(record,action)
+            cr.addWidget(btn('RED',lambda:choose_side('RED'),True))
+            cr.addWidget(btn('BLUE',lambda:choose_side('BLUE'),True))
+            rv.addWidget(choices)
+        rv.addWidget(label('CONFIRMED SIDES'))
+        for action in selected_maps(record):
             chosen=record.get('sides',{}).get(action['map_id'])
-            desc='DECIDER' if action['kind']=='decider' else 'PICKED BY '+record['teams'][action['team']]
-            side_text=('  ·  '+record['teams'][owner]+' chose '+chosen) if chosen else '  ·  '+record['teams'][owner]+' TO CHOOSE SIDE'
-            rv.addWidget(label(str(i+1)+'. '+name_of(record,action['map_id'])+'  ·  '+desc+side_text))
-        rv.addWidget(label('BANNED: '+', '.join(name_of(record,a['map_id']) for a in record['actions'] if a['kind']=='ban'),True))
-        actions=QWidget();ar=QHBoxLayout(actions);ar.setContentsMargins(0,0,0,0)
+            if chosen:
+                owner=side_owner(record,action)
+                rv.addWidget(label(name_of(record,action['map_id'])+' — '+record['teams'][owner]+': '+chosen))
+        rv.addStretch()
         def undo_action():
             if record.get('sides'):
-                # Revoke the most recently assigned side before undoing a map action.
                 last=next((a for a in reversed(selected_maps(record)) if a['map_id'] in record['sides']),None)
                 if last:
                     record['sides'].pop(last['map_id'],None);record['completed']=False
                     self.save();self.veto_page();return
             if undo(record):self.save();self.veto_page()
-        ar.addWidget(btn('UNDO LAST',undo_action))
-        ar.addWidget(btn('COPY VETO IMAGE',lambda:self.copy_board(record),True))
-        rv.addWidget(actions)
-        self.w.cv.addWidget(results);self.w.cv.addStretch()
+        rv.addWidget(btn('UNDO LAST',undo_action))
+        rv.addWidget(btn('COPY VETO IMAGE',lambda:self.copy_board(record),True))
+        self.w.cv.addWidget(content,1)
 
     def copy_board(self,record):
         # Render an independent, clean image instead of screenshotting the admin controls.
