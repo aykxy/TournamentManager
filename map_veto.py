@@ -345,29 +345,47 @@ class VetoPage:
 
     def _coin_flip(self,record):
         dialog=QDialog(self.w)
-        dialog.setWindowTitle('First ban coin flip')
+        dialog.setWindowTitle('First ban draw')
         dialog.setModal(True)
-        dialog.resize(430,210)
+        dialog.setMinimumSize(530,300)
+        dialog.setStyleSheet('QDialog{background:#181b1d;}')
         layout=QVBoxLayout(dialog)
-        title=section_heading('FLIPPING FOR FIRST BAN...')
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-        result=label('')
+        layout.setContentsMargins(28,25,28,25)
+        layout.setSpacing(16)
+        eyebrow=label('RANDOM FIRST BAN DRAW')
+        eyebrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        eyebrow.setStyleSheet('font-size:15px;font-weight:700;color:#a9b5ae;letter-spacing:2px;')
+        layout.addWidget(eyebrow)
+        result=label('VS')
         result.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        result.setStyleSheet('font-size:23px;font-weight:bold;color:#58dc00;')
-        layout.addWidget(result)
+        result.setStyleSheet('font-size:38px;font-weight:900;color:#f5f7f5;padding:24px;'
+                             'background:#242c29;border:2px solid #4a6656;border-radius:12px;')
+        layout.addWidget(result,1)
+        caption=label('SELECTING WHICH TEAM BANS FIRST')
+        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        caption.setStyleSheet('font-size:16px;font-weight:700;color:#aab7ad;')
+        layout.addWidget(caption)
+        continue_button=btn('CONTINUE TO MAP VETO',dialog.accept,True)
+        continue_button.setMinimumHeight(44)
+        continue_button.setVisible(False)
+        layout.addWidget(continue_button)
         frames={'n':0}
+        # Deliberately slow down the reveal instead of rapidly flickering text.
+        intervals=[100,110,120,135,155,180,215,260,320,390,480,600]
         def animate():
-            frames['n']+=1
-            if frames['n']>=12:
-                timer.stop()
-                title.setText('FIRST BAN DECIDED')
+            index=frames['n']
+            if index>=len(intervals):
                 result.setText(record['teams'][record['first']].upper())
-                QTimer.singleShot(900,dialog.accept)
-            else:result.setText(record['teams'][frames['n']%2].upper())
-        timer=QTimer(dialog)
-        timer.timeout.connect(animate)
-        timer.start(110)
+                result.setStyleSheet('font-size:40px;font-weight:900;color:#a8ff86;padding:24px;'
+                                     'background:#1e3529;border:2px solid #58dc00;border-radius:12px;')
+                eyebrow.setText('FIRST BAN WINNER')
+                caption.setText('THIS TEAM WILL BAN THE FIRST MAP')
+                QTimer.singleShot(3000,lambda:continue_button.setVisible(True))
+                return
+            result.setText(record['teams'][index%2].upper())
+            frames['n']+=1
+            QTimer.singleShot(intervals[index],animate)
+        QTimer.singleShot(200,animate)
         dialog.exec()
         self.veto_page()
 
@@ -496,7 +514,18 @@ class VetoPage:
         step=next_action(record)
         side=pending_side(record)
         if step:
-            lv.addWidget(section_heading('STEP '+str(step['step'])+'/6  ·  '+record['teams'][step['team']].upper()+' — '+step['kind'].upper()+' A MAP'))
+            turn=QFrame()
+            turn.setStyleSheet('QFrame{background:#203127;border:2px solid #58dc00;border-radius:10px;}'
+                               'QLabel{border:none;background:transparent;}')
+            turn_layout=QVBoxLayout(turn)
+            turn_layout.setContentsMargins(18,14,18,14)
+            who=label(record['teams'][step['team']].upper())
+            who.setStyleSheet('font-size:30px;font-weight:900;color:#b2ff91;')
+            turn_layout.addWidget(who)
+            instruction=label('CURRENT TURN  ·  '+step['kind'].upper()+' A MAP  ·  STEP '+str(step['step'])+'/6')
+            instruction.setStyleSheet('font-size:17px;font-weight:800;color:#f2f7f2;')
+            turn_layout.addWidget(instruction)
+            lv.addWidget(turn)
         elif record.get('completed'):
             lv.addWidget(section_heading('VETO COMPLETE — ALL SIDES CONFIRMED'))
         else:
@@ -542,7 +571,18 @@ class VetoPage:
             rv.addWidget(item)
         if side:
             owner=side_owner(record,side)
-            rv.addWidget(section_heading('SIDE PICK — '+record['teams'][owner].upper()))
+            side_banner=QFrame()
+            side_banner.setStyleSheet('QFrame{background:#233143;border:2px solid #6cb7ff;border-radius:10px;}'
+                                      'QLabel{border:none;background:transparent;}')
+            side_layout=QVBoxLayout(side_banner)
+            side_layout.setContentsMargins(14,12,14,12)
+            side_title=label('SIDE PICK — '+record['teams'][owner].upper())
+            side_title.setStyleSheet('font-size:24px;font-weight:900;color:#a8d8ff;')
+            side_layout.addWidget(side_title)
+            side_hint=label('THIS TEAM MUST CHOOSE RED OR BLUE')
+            side_hint.setStyleSheet('font-size:15px;font-weight:800;color:#f2f7f2;')
+            side_layout.addWidget(side_hint)
+            rv.addWidget(side_banner)
             rv.addWidget(label(name_of(record,side['map_id'])+' · Other team gets opposite side.',True))
             map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
             rv.addWidget(image_label(map_rec.get('spawns'),340,155))
