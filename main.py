@@ -82,6 +82,7 @@ NAV_PATHS={
     'Tournaments':'<path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4"/>',
     'Players':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3.13a4 4 0 0 1 0 7.75M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
     'Teams':'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+    'Unofficial Teams':'<path d="M3 7h18M5 12h14M8 17h8"/>',
     'Settings':'<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.86 1.86-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 1.56V21h-6v-1.04A1.7 1.7 0 0 0 8 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-1.86-1.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H2v-4h1.04A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88L4.2 7.06 6.06 5.2l.06.06A1.7 1.7 0 0 0 8 5.6a1.7 1.7 0 0 0 1-1.56V3h6v1.04A1.7 1.7 0 0 0 16 5.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 1.86 1.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1H22v4h-1.04A1.7 1.7 0 0 0 19.4 15Z"/>'
 }
 def nav_icon(name):
@@ -182,7 +183,7 @@ class Window(QMainWindow):
             logo=QLabel();logo.setPixmap(QPixmap(str(ASSET)).scaled(30,30,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation));br.addWidget(logo)
         brandname=label('ARENA\nTOURNAMENT MANAGER');brandname.setStyleSheet('background:transparent;font-weight:750;font-size:12px;letter-spacing:0.4px;');br.addWidget(brandname,1);sv.addWidget(brand);sv.addSpacing(13);sv.addWidget(label('  MANAGEMENT','muted'));sv.addSpacing(5)
         self.nav={}
-        for title in ('Overview','Tournaments','Players','Teams','Settings'):
+        for title in ('Overview','Tournaments','Players','Teams','Unofficial Teams','Settings'):
             b=button(title,lambda _,s=title:self.navigate(s))
             b.setIcon(nav_icon(title));b.setIconSize(QSize(16,16))
             self.nav[title]=b;sv.addWidget(b)
@@ -325,6 +326,7 @@ class Window(QMainWindow):
         if self.section=='Settings':self.settings_page()
         elif self.section=='Players':self.players_page()
         elif self.section=='Teams':self.teams_page()
+        elif self.section=='Unofficial Teams':self.unofficial_teams_page()
         elif self.section=='Overview':self.overview_page()
         elif self.t():self.tournament_page()
         else:self.tournaments_page()
@@ -809,6 +811,32 @@ class Window(QMainWindow):
         ar.addStretch()
         ar.addWidget(button('RENAME SELECTED TEAM',rename))
         self.cv.addWidget(actions)
+
+    def unofficial_teams_page(self):
+        self.header('UNOFFICIAL TEAMS','CASUAL TOURNAMENT TEAMS / INFORMATION ONLY')
+        self.cv.addWidget(label('Teams from tournaments without locked rosters. These do not affect the official Teams database or transfer windows.','muted'))
+        self.cv.addSpacing(12)
+        search=QLineEdit();search.setPlaceholderText('SEARCH UNOFFICIAL TEAMS, PLAYERS OR TOURNAMENTS...')
+        self.cv.addWidget(search)
+        self.cv.addSpacing(12)
+        summary=label('0 UNOFFICIAL TEAM ENTRIES','muted');self.cv.addWidget(summary)
+        table=self.table(['TEAM','TOURNAMENT','PLAYERS','ROSTER'])
+        self.cv.addWidget(table,1)
+        entries=[]
+        for tournament in self.data.get('tournaments',[]):
+            if tournament.get('locked',True):
+                continue
+            for team in tournament.get('teams',[]):
+                members=team.get('members',[])
+                entries.append([team.get('name',''),tournament.get('name',''),
+                                str(len(members)),', '.join(self.display_player_name(p) for p in members)])
+        def refresh():
+            query=search.text().strip().casefold()
+            rows=[row for row in entries if not query or query in ' '.join(row).casefold()]
+            self.fill_table(table,rows)
+            summary.setText(f'{len(rows)} / {len(entries)} UNOFFICIAL TEAM ENTRIES')
+        search.textChanged.connect(refresh)
+        refresh()
 
     def new_transfer_window(self):
         d=QDialog(self);d.setWindowTitle('Create transfer window');d.resize(540,440)
