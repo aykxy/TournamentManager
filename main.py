@@ -340,6 +340,11 @@ class Window(QMainWindow):
         self.veto_ui=VetoPage(self)
         self.veto_ui.render()
 
+    def new_veto_for_tournament(self,tournament_id):
+        self.section='Map Veto'
+        self.render()
+        self.veto_ui.new_page(preselected_tournament_id=tournament_id)
+
     def header(self,title,subtitle='',action=None):
         bar=QWidget();r=layout_row(bar)
         texts=QWidget();v=layout_col(texts,5);v.addWidget(label(title,'heading'))
@@ -613,6 +618,7 @@ class Window(QMainWindow):
         for name in ['Checklist','Teams','Streams','Bracket','Results','Files']:
             b=button(name,lambda _,s=name:self.change_tab(s));b.setObjectName('tabActive' if self.tab==name else 'tab');r.addWidget(b)
         r.addStretch()
+        r.addWidget(button('+ MAP VETO',lambda checked=False,tid=t['id']:self.new_veto_for_tournament(tid)))
         r.addWidget(button('Delete tournament',self.delete_tournament))
         self.cv.addWidget(tabs);self.cv.addSpacing(18)
         {'Checklist':self.checklist,'Teams':self.tournament_teams,'Streams':self.streams,'Bracket':self.bracket_page,'Results':self.results_page,'Files':self.files_page}[self.tab](t)
