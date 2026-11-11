@@ -18,7 +18,7 @@ VERSION='1.0.2'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
 TASKS=[('announce','Announce tournament','manual'),('qopen','Announce qualifiers open','manual'),('qclose','Announce qualifiers closed','manual'),('received','Receive stream key document & tournament export from developer','manual'),('files','Upload stream key document & tournament export','auto'),('tickets','Add team players to their team ticket','manual'),('congrats','Send congratulations / acceptance and misc info','manual'),('guide','Send OBS guide in team tickets','manual'),('keys','DM stream keys to players','auto'),('bracket','Create bracket via Bracket HQ','manual'),('games','Create tournament games','manual'),('live','Announce tournament is live','manual'),('results','Record tournament results','manual')]
 STYLE='''
-QWidget {background:transparent;color:#e8e8ec;font-family:"Pixelify Sans";font-size:13px;}
+QWidget {background:transparent;color:#e8e8ec;font-family:"Rajdhani";font-size:13px;}
 QWidget#appRoot {background:#242426;}
 QLabel {background:transparent;border:none;}
 QFrame {background:transparent;}
@@ -1211,7 +1211,7 @@ if __name__=='__main__':
         except (AttributeError, OSError):
             pass
     app=QApplication(sys.argv);app.setStyle('Fusion')
-    font_path=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))/'assets'/'PixelifySans.ttf'
+    font_path=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))/'assets'/'Rajdhani-SemiBold.ttf'
     if font_path.exists():
         font_id=QFontDatabase.addApplicationFont(str(font_path))
         families=QFontDatabase.applicationFontFamilies(font_id) if font_id>=0 else []
