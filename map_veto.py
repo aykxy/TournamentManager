@@ -286,16 +286,17 @@ class VetoPage:
         self.w.cv.addWidget(label('Map and combined RED/BLUE spawn images can be uploaded at any time.',True))
         self.w.cv.addStretch()
 
-    def new_page(self):
+    def new_page(self,preselected_tournament_id=None):
         self._clear_body()
         p,v=panel();v.addWidget(label('CREATE MAP VETO'))
         if len(self.data['active_map_ids'])!=7:
             v.addWidget(label('Set exactly seven active maps in MAP POOL before starting a veto.',True))
             v.addWidget(btn('OPEN MAP POOL',self.pool_page))
             self.w.cv.addWidget(p);return
-        a=QLineEdit();a.setPlaceholderText('TEAM A')
-        b=QLineEdit();b.setPlaceholderText('TEAM B')
-        v.addWidget(a);v.addWidget(b)
+        a=QComboBox();a.setEditable(True);a.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        b=QComboBox();b.setEditable(True);b.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        v.addWidget(label('TEAM A'));v.addWidget(a)
+        v.addWidget(label('TEAM B'));v.addWidget(b)
         fmt=QComboBox();fmt.addItems(['BO1','BO3','BO5']);v.addWidget(label('MATCH FORMAT'));v.addWidget(fmt)
         tournament=QComboBox()
         tournament.setMinimumWidth(360)
@@ -312,19 +313,63 @@ class VetoPage:
                 tournament.addItem(title.split(' ')[0]+'  ·  '+str(t.get('name','Unnamed tournament')),t['id'])
         v.addWidget(label('TOURNAMENT (OPTIONAL)'))
         v.addWidget(tournament)
-        v.addWidget(label('Select an official tournament above, or leave this veto unlinked.',True))
+        v.addWidget(label('Choose tournament teams or enter names manually.',True))
+        def update_teams():
+            tid=tournament.currentData()
+            selected=next((t for t in tournaments if str(t['id'])==str(tid)),None)
+            names=list(dict.fromkeys(str(team.get('name','')).strip() for team in selected.get('teams',[]) if team.get('name'))) if selected else []
+            for combo in (a,b):
+                previous=combo.currentText()
+                combo.blockSignals(True)
+                combo.clear()
+                combo.addItems(names)
+                combo.setCurrentText(previous if previous in names else '')
+                combo.blockSignals(False)
+        tournament.currentIndexChanged.connect(lambda *_:update_teams())
+        if preselected_tournament_id is not None:
+            idx=tournament.findData(preselected_tournament_id)
+            if idx>=0:tournament.setCurrentIndex(idx)
+        update_teams()
         def start():
             ids=set(self.data['active_map_ids'])
             pool=[copy.deepcopy(m) for m in self.data['map_library'] if m['id'] in ids]
-            try:record=new_veto(a.text(),b.text(),fmt.currentText(),pool,tournament.currentData())
+            try:record=new_veto(a.currentText(),b.currentText(),fmt.currentText(),pool,tournament.currentData())
             except ValueError as exc:
                 QMessageBox.warning(self.w,'Cannot create veto',str(exc));return
             self.data['map_vetoes'].append(record)
             if not self.save():
                 self.data['map_vetoes'].remove(record);return
-            self.current=record['id'];self.veto_page()
+            self.current=record['id'];self._coin_flip(record)
         v.addWidget(btn('RANDOMISE FIRST BAN & START',start,True))
         self.w.cv.addWidget(p);self.w.cv.addStretch()
+
+    def _coin_flip(self,record):
+        dialog=QDialog(self.w)
+        dialog.setWindowTitle('First ban coin flip')
+        dialog.setModal(True)
+        dialog.resize(430,210)
+        layout=QVBoxLayout(dialog)
+        title=section_heading('FLIPPING FOR FIRST BAN...')
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        result=label('')
+        result.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        result.setStyleSheet('font-size:23px;font-weight:bold;color:#58dc00;')
+        layout.addWidget(result)
+        frames={'n':0}
+        def animate():
+            frames['n']+=1
+            if frames['n']>=12:
+                timer.stop()
+                title.setText('FIRST BAN DECIDED')
+                result.setText(record['teams'][record['first']].upper())
+                QTimer.singleShot(900,dialog.accept)
+            else:result.setText(record['teams'][frames['n']%2].upper())
+        timer=QTimer(dialog)
+        timer.timeout.connect(animate)
+        timer.start(110)
+        dialog.exec()
+        self.veto_page()
 
     def history_page(self):
         self._clear_body();self.history_page_content()
