@@ -512,7 +512,7 @@ class VetoPage:
         left,lv=panel();right,rv=panel()
         columns.addWidget(left,3);columns.addWidget(right,2)
         step=next_action(record)
-        side=pending_side(record)
+        pending_sides=[action for action in selected_maps(record) if action['map_id'] not in record.get('sides',{})]
         if step:
             turn=QFrame()
             turn.setStyleSheet('QFrame{background:#203127;border:2px solid #58dc00;border-radius:10px;}'
@@ -522,7 +522,7 @@ class VetoPage:
             who=label(record['teams'][step['team']].upper())
             who.setStyleSheet('font-size:30px;font-weight:900;color:#b2ff91;')
             turn_layout.addWidget(who)
-            instruction=label('CURRENT TURN  ·  '+step['kind'].upper()+' A MAP  ·  STEP '+str(step['step'])+'/6')
+            instruction=label('NEXT MAP ACTION  ·  '+step['kind'].upper()+' A MAP  ·  STEP '+str(step['step'])+'/6')
             instruction.setStyleSheet('font-size:17px;font-weight:800;color:#f2f7f2;')
             turn_layout.addWidget(instruction)
             lv.addWidget(turn)
@@ -558,6 +558,9 @@ class VetoPage:
                 cv.addWidget(btn(step['kind'].upper(),select,True))
             g.addWidget(card,i//3,i%3)
         lv.addWidget(grid)
+        if step and pending_sides:
+            rv.addWidget(label('BOTH ACTIONS ARE OPEN — '+record['teams'][step['team']].upper()+
+                               ' CAN '+step['kind'].upper()+' THE NEXT MAP WHILE SIDE PICKS ARE DECIDED.'))
         rv.addWidget(section_heading('VETO HISTORY'))
         for i,action in enumerate(record['actions']):
             word='banned' if action['kind']=='ban' else 'picked'
@@ -569,8 +572,10 @@ class VetoPage:
             item=label('7. System picked '+name_of(record,dec['map_id']))
             item.setStyleSheet('color:#00d78a;')
             rv.addWidget(item)
-        if side:
-            owner=side_owner(record,side)
+        if pending_sides:
+            rv.addWidget(section_heading('SIDE PICKS — CAN BE DONE ALONGSIDE BANS / PICKS'))
+        for side_action in pending_sides:
+            owner=side_owner(record,side_action)
             side_banner=QFrame()
             side_banner.setStyleSheet('QFrame{background:#233143;border:2px solid #6cb7ff;border-radius:10px;}'
                                       'QLabel{border:none;background:transparent;}')
@@ -579,19 +584,19 @@ class VetoPage:
             side_title=label('SIDE PICK — '+record['teams'][owner].upper())
             side_title.setStyleSheet('font-size:24px;font-weight:900;color:#a8d8ff;')
             side_layout.addWidget(side_title)
-            side_hint=label('THIS TEAM MUST CHOOSE RED OR BLUE')
-            side_hint.setStyleSheet('font-size:15px;font-weight:800;color:#f2f7f2;')
+            side_hint=label('CHOOSE SIDES FOR '+name_of(record,side_action['map_id']).upper())
+            side_hint.setStyleSheet('font-size:16px;font-weight:800;color:#f2f7f2;')
             side_layout.addWidget(side_hint)
             rv.addWidget(side_banner)
-            rv.addWidget(label(name_of(record,side['map_id'])+' · Other team gets opposite side.',True))
-            map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
+            rv.addWidget(label('The other team gets the opposite side. You can continue map bans/picks at any time.',True))
+            map_rec=next(m for m in record['pool'] if m['id']==side_action['map_id'])
             rv.addWidget(image_label(map_rec.get('spawns'),340,155))
             choices=QWidget();cr=QHBoxLayout(choices);cr.setContentsMargins(0,0,0,0)
-            def choose_side(colour):
-                apply_side(record,side['map_id'],colour)
+            def choose_side(colour,mid=side_action['map_id']):
+                apply_side(record,mid,colour)
                 if self.save():self.veto_page()
-            cr.addWidget(btn('RED',lambda:choose_side('RED'),True))
-            cr.addWidget(btn('BLUE',lambda:choose_side('BLUE'),True))
+            cr.addWidget(btn('RED',lambda checked=False,mid=side_action['map_id']:choose_side('RED',mid),True))
+            cr.addWidget(btn('BLUE',lambda checked=False,mid=side_action['map_id']:choose_side('BLUE',mid),True))
             rv.addWidget(choices)
         # Once side picking is finished, show confirmed assignments in place
         # of the now-irrelevant pending side panel, not below its old position.
