@@ -904,7 +904,7 @@ class Window(QMainWindow):
                     seen.add(uid);previous=old.get(uid,{})
                     members.append({'arena_id':uid,'name':self.display_player_name({'arena_id':uid,'name':p['name']}),'imported_name':p['name'],'discord_id':previous.get('discord_id',self.data['discord_mappings'].get(uid,'')),'key':previous.get('key'),'sent':previous.get('sent',False)})
                 team_name=team['crewName'].strip()
-                tid='arena:'+str(team['crewId']) if team.get('crewId') is not None else next((k for k,v in self.data.get('teams_db',{}).items() if team_name.lower() in [n.lower() for n in v.get('names',[v.get('name','')])]),'local:'+str(uuid.uuid4()))
+                tid=('arena:'+str(team['crewId']) if team.get('crewId') is not None else next((k for k,v in self.data.get('teams_db',{}).items() if team_name.lower() in [n.lower() for n in v.get('names',[v.get('name','')])]),'local:'+str(uuid.uuid4()))) if t.get('locked') else 'unofficial:'+str(t['id'])+':'+str(i)
                 teams.append({'name':team_name,'team_id':tid,'sub':i>=t['main'],'members':members})
             if t['teams'] and QMessageBox.question(self,'Replace rosters?','Re-importing can change roster assignments. Continue?')!=QMessageBox.StandardButton.Yes:return
             if t.get('locked'):
@@ -916,12 +916,13 @@ class Window(QMainWindow):
                 if conflicts and QMessageBox.question(self,'Locked roster mismatch',f"Imported roster differs from saved locked roster for: {', '.join(conflicts)}.\n\nApprove tournament-specific roster snapshot? Permanent rosters will NOT be overwritten.")!=QMessageBox.StandardButton.Yes:return
             if DATA.exists() and self.protected_backup('before_team_import') is False:return
             t['teams']=teams;t['teams_imported']=True
-            for team in teams:
-                tid=team['team_id'];rec=self.data.setdefault('teams_db',{}).get(tid)
-                if not rec:
-                    self.data['teams_db'][tid]={'id':tid,'name':team['name'],'names':[team['name']],'roster':[p['arena_id'] for p in team['members']],'history':[]}
-                else:
-                    if team['name'] not in rec.setdefault('names',[]):rec['names'].append(team['name']);rec['name']=team['name']
+            if t.get('locked'):
+                for team in teams:
+                    tid=team['team_id'];rec=self.data.setdefault('teams_db',{}).get(tid)
+                    if not rec:
+                        self.data['teams_db'][tid]={'id':tid,'name':team['name'],'names':[team['name']],'roster':[p['arena_id'] for p in team['members']],'history':[]}
+                    else:
+                        if team['name'] not in rec.setdefault('names',[]):rec['names'].append(team['name']);rec['name']=team['name']
             for team in teams:
                 for p in team['members']:
                     self.data['players'].setdefault(p['arena_id'],{'name':p['name'],'discord_id':p['discord_id'],'notes':''})
