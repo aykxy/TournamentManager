@@ -17,7 +17,7 @@ ASSETS_DIR=Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'asse
 ASSET=ASSETS_DIR/'arena_logo.png'
 ICON_ASSET=ASSETS_DIR/'arena_logo.ico'
 GREEN='#58dc00'
-VERSION='1.0.3'
+VERSION='1.0.4'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
 TASKS=[('announce','Announce tournament','manual'),('qopen','Announce qualifiers open','manual'),('qclose','Announce qualifiers closed','manual'),('received','Receive stream key document & tournament export from developer','manual'),('files','Upload stream key document & tournament export','auto'),('tickets','Add team players to their team ticket','manual'),('congrats','Send congratulations / acceptance and misc info','manual'),('guide','Send OBS guide in team tickets','manual'),('keys','DM stream keys to players','auto'),('bracket','Create bracket via Bracket HQ','manual'),('games','Create tournament games','manual'),('live','Announce tournament is live','manual'),('results','Record tournament results','manual')]
 STYLE='''
