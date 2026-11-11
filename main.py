@@ -4,6 +4,7 @@ from pathlib import Path
 from backup_manager import snapshot, list_snapshots, restore as restore_backup, read_validated, atomic_write
 from overview_logic import overview, task_complete, deadline_status
 from team_reconciliation import reconcile_teams
+from map_veto import VetoPage
 from notifications import due_events, event_key, send_discord, validate_webhook
 from PySide6.QtCore import Qt, QDate, QDateTime, QSize, QUrl, QTimer, QObject, Signal, QByteArray
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QFontDatabase, QFont
@@ -186,7 +187,7 @@ class Window(QMainWindow):
             logo=QLabel();logo.setPixmap(QPixmap(str(ASSET)).scaled(30,30,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation));br.addWidget(logo)
         brandname=label('ARENA\nTOURNAMENT MANAGER');brandname.setStyleSheet('background:transparent;font-weight:750;font-size:12px;letter-spacing:0.4px;');br.addWidget(brandname,1);sv.addWidget(brand);sv.addSpacing(13);sv.addWidget(label('  MANAGEMENT','muted'));sv.addSpacing(5)
         self.nav={}
-        for title in ('Overview','Tournaments','Players','Teams','Unofficial Teams','Settings'):
+        for title in ('Overview','Tournaments','Players','Teams','Unofficial Teams','Map Veto','Settings'):
             b=button(title,lambda _,s=title:self.navigate(s))
             b.setIcon(nav_icon(title));b.setIconSize(QSize(16,16))
             self.nav[title]=b;sv.addWidget(b)
@@ -330,9 +331,14 @@ class Window(QMainWindow):
         elif self.section=='Players':self.players_page()
         elif self.section=='Teams':self.teams_page()
         elif self.section=='Unofficial Teams':self.unofficial_teams_page()
+        elif self.section=='Map Veto':self.map_veto_page()
         elif self.section=='Overview':self.overview_page()
         elif self.t():self.tournament_page()
         else:self.tournaments_page()
+    def map_veto_page(self):
+        self.veto_ui=VetoPage(self)
+        self.veto_ui.render()
+
     def header(self,title,subtitle='',action=None):
         bar=QWidget();r=layout_row(bar)
         texts=QWidget();v=layout_col(texts,5);v.addWidget(label(title,'heading'))
