@@ -26,6 +26,18 @@ class TeamReconciliationTests(unittest.TestCase):
         d={'teams_db':{},'tournaments':[{'teams':[{'name':'LOL','crewId':99,'members':[{'arena_id':'5'}]}]}]}
         reconcile_teams(d)
         self.assertIn('arena:99',d['teams_db']);self.assertEqual(d['tournaments'][0]['teams'][0]['team_id'],'arena:99')
+    def test_unlocked_tournament_never_registers_team(self):
+        d={'teams_db':{},'tournaments':[{'locked':False,'teams':[{'name':'FUN','team_id':'arena:99','members':[{'arena_id':'5'}]}]}]}
+        changed,review=reconcile_teams(d)
+        self.assertEqual(changed,0)
+        self.assertEqual(review,[])
+        self.assertEqual(d['teams_db'],{})
+
+    def test_locked_tournament_still_registers_team(self):
+        d={'teams_db':{},'tournaments':[{'locked':True,'teams':[{'name':'COMP','team_id':'arena:99','members':[{'arena_id':'5'}]}]}]}
+        reconcile_teams(d)
+        self.assertIn('arena:99',d['teams_db'])
+
     def test_idempotent(self):
         d=self.sample();reconcile_teams(d);self.assertEqual(reconcile_teams(d)[0],0)
 
