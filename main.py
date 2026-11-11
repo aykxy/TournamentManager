@@ -186,7 +186,7 @@ class Window(QMainWindow):
             b=button(title,lambda _,s=title:self.navigate(s))
             b.setIcon(nav_icon(title));b.setIconSize(QSize(16,16))
             self.nav[title]=b;sv.addWidget(b)
-        sv.addStretch();sv.addWidget(label('●  Local database','muted'));self.update_button=button('Check for updates',lambda:self.navigate('Settings'));sv.addWidget(self.update_button);sv.addWidget(label('Version '+VERSION,'muted'))
+        sv.addStretch();sv.addWidget(label('●  Local database','muted'));sv.addWidget(label('Version '+VERSION,'muted'))
         self.content=QWidget();self.cv=layout_col(self.content,0,(22,22,22,22));root.addWidget(self.content,1)
         self.render()
         if self.reconcile_ambiguous:
@@ -437,7 +437,7 @@ class Window(QMainWindow):
         controls=QWidget();cr=layout_row(controls,10)
         search=QLineEdit();search.setPlaceholderText('SEARCH TOURNAMENTS...')
         cr.addWidget(search,1)
-        cr.addWidget(button('RECENTLY DELETED / RESTORE',self.restore_tournament))
+        cr.addWidget(button('RECENTLY DELETED',self.restore_tournament))
         self.cv.addWidget(controls)
         self.cv.addSpacing(12)
         count=label('','muted');self.cv.addWidget(count)
@@ -529,7 +529,7 @@ class Window(QMainWindow):
     def task_done(self,t,key):
         return task_complete(t,key)
     def tournament_page(self):
-        t=self.t();self.cv.addWidget(button('←  All tournaments',lambda:self.navigate('Tournaments')))
+        t=self.t();back=QWidget();br=layout_row(back,8);br.addWidget(button('←  ALL TOURNAMENTS',lambda:self.navigate('Tournaments')));br.addStretch();self.cv.addWidget(back)
         self.cv.addSpacing(13);self.header(t['name'],f"{self.date_label(t)}  ·  {t['format']}  ·  {t['main']} main / {t['subs']} substitute teams  ·  {t['status']}")
         tabs=QWidget();r=layout_row(tabs,2)
         for name in ['Checklist','Teams','Streams','Bracket','Results','Files']:
@@ -651,6 +651,7 @@ class Window(QMainWindow):
         self.cv.addSpacing(10)
         search=QLineEdit();search.setPlaceholderText('SEARCH PLAYER, ARENA ID, DISCORD ID OR TEAM...')
         self.cv.addWidget(search)
+        self.cv.addSpacing(12)
         count=label('','muted');self.cv.addWidget(count)
         table=self.table(['PLAYER','ARENA ID','DISCORD ID','MOST RECENT TEAM','APPEARANCES'])
         self.cv.addWidget(table,1)
@@ -658,7 +659,7 @@ class Window(QMainWindow):
             records=self.player_records();rows=[];ids=[]
             for uid,rec in sorted(records.items(),key=lambda x:x[1].get('name','').lower()):
                 team=rec['appearances'][-1][1] if rec['appearances'] else '—'
-                row=[rec.get('name',''),uid,rec.get('discord_id',''),team,len(rec['appearances'])]
+                row=[rec.get('name',''),uid,rec.get('discord_id','') or 'NOT LINKED',team,len(rec['appearances'])]
                 if search.text().lower() in ' '.join(map(str,row)).lower():
                     rows.append(row);ids.append(uid)
             self.fill_table(table,rows);table.setProperty('ids',ids)
@@ -668,12 +669,12 @@ class Window(QMainWindow):
             idx=table.currentRow();ids=table.property('ids') or []
             if idx<0 or idx>=len(ids):return
             uid=ids[idx];rec=self.player_records()[uid]
-            d=QDialog(self);d.setWindowTitle(f'Player · {rec.get("name",uid)}');d.resize(560,480);v=layout_col(d,13,(22,22,22,22))
+            d=QDialog(self);d.setWindowTitle(f'Player · {rec.get("name",uid)}');d.resize(570,550);v=layout_col(d,13,(22,22,22,22))
             v.addWidget(label(rec.get('name',uid),'heading'));v.addWidget(label(f'Arena ID: {uid}','muted'))
             v.addWidget(label('Preferred player name'));preferred=QLineEdit(rec.get('name',uid));v.addWidget(preferred)
             v.addWidget(label('Discord user ID'));discord=QLineEdit(rec.get('discord_id',''));v.addWidget(discord)
             v.addWidget(label('Notes'));notes=QTextEdit(rec.get('notes',''));notes.setMaximumHeight(100);v.addWidget(notes)
-            v.addWidget(label('Tournament history','subheading'))
+            v.addWidget(label(f'TOURNAMENT HISTORY  ·  {len(rec["appearances"])} APPEARANCES','subheading'))
             hist=QTextEdit();hist.setReadOnly(True);hist.setPlainText('\n'.join(f'{date}  ·  {tour}  ·  {team}' for tour,team,date in rec['appearances']));v.addWidget(hist)
             def save_profile():
                 value=discord.text().strip();new_name=preferred.text().strip()
@@ -690,8 +691,9 @@ class Window(QMainWindow):
                         for p in team['members']:
                             if str(p['arena_id'])==uid:p['discord_id']=value;p['name']=new_name
                 self.save();d.accept();self.render()
-            v.addWidget(button('Save profile',save_profile,True));d.exec()
-        table.cellDoubleClicked.connect(lambda *_:open_profile());self.cv.addWidget(button('Open selected player',open_profile))
+            footer=QWidget();buttons=layout_row(footer,8);buttons.addStretch();buttons.addWidget(button('CANCEL',d.reject));buttons.addWidget(button('SAVE PROFILE',save_profile,True));v.addWidget(footer);d.exec()
+        table.cellDoubleClicked.connect(lambda *_:open_profile())
+        footer=QWidget();fr=layout_row(footer,8);fr.addStretch();fr.addWidget(button('VIEW / EDIT PLAYER',open_profile));self.cv.addWidget(footer)
     def teams_page(self):
         self.header('TEAMS','PERMANENT TEAM IDENTITIES / ROSTERS / TRANSFER WINDOWS',
                     ('+ TRANSFER WINDOW',self.new_transfer_window))
@@ -862,7 +864,11 @@ class Window(QMainWindow):
     def files_page(self,t):
         self.cv.addWidget(label('Tournament files','subheading'))
         self.cv.addWidget(label('Upload the tournament JSON and Cloudflare TXT after receiving them from an Arena developer.','muted'))
-        self.cv.addSpacing(15);self.cv.addWidget(button('Import tournament export (.json)',self.import_teams,True));self.cv.addWidget(button('Import Cloudflare stream keys (.txt)',self.import_keys))
+        self.cv.addSpacing(15)
+        imports=QWidget();ir=layout_row(imports,12)
+        ir.addWidget(button('IMPORT TOURNAMENT EXPORT (.JSON)',self.import_teams,True))
+        ir.addWidget(button('IMPORT CLOUDFLARE STREAM KEYS (.TXT)',self.import_keys))
+        ir.addStretch();self.cv.addWidget(imports)
         self.cv.addWidget(label(f"Teams imported: {'Yes' if t.get('teams_imported') else 'No'}    ·    Stream keys imported: {'Yes' if t.get('keys_imported') else 'No'}",'muted'))
         self.cv.addStretch()
     def import_keys(self):
@@ -1001,7 +1007,7 @@ class Window(QMainWindow):
                 QMessageBox.warning(self,'No placements','Select at least one team.');return
             t['results']={'placements':placements}
             if self.save():self.render();QMessageBox.information(self,'Saved','Podium and rewards saved.')
-        self.cv.addWidget(button('Save results',save_results,True));self.cv.addStretch()
+        footer=QWidget();fr=layout_row(footer,8);fr.addStretch();fr.addWidget(button('SAVE RESULTS',save_results,True));self.cv.addWidget(footer);self.cv.addStretch()
 
     def bracket_page(self,t):
         self.cv.addWidget(label('Bracket HQ','subheading'))
@@ -1128,19 +1134,34 @@ class Window(QMainWindow):
         QMessageBox.critical(self,'Update failed',message+'\n\nYour current installation has not been replaced.')
 
     def settings_page(self):
-        self.header('Settings & Updates','Local data, backups and software updates')
-        self.cv.addWidget(label('Installed version: '+VERSION,'subheading'))
-        self.cv.addWidget(label('Updates are checked from GitHub Releases: aykxy/TournamentManager','muted'))
-        self.cv.addSpacing(12)
-        self.cv.addWidget(button('Check for updates',self.check_updates_background))
-        if self.update_info:self.cv.addWidget(button('Install update '+str(self.update_info['version']),self.install_update,True))
-        self.cv.addSpacing(22);self.cv.addWidget(label('Checklist notifications','subheading'))
-        self.cv.addWidget(label('Windows and Discord reminders 24 hours before deadlines, plus overdue alerts.','muted'))
-        self.cv.addWidget(button('Configure notifications',self.edit_notification_settings))
-        self.cv.addSpacing(22);self.cv.addWidget(label('Backups & Recovery','subheading'))
-        self.cv.addWidget(label('Rolling backups retain the latest 25 saves. Protected and manual snapshots are never automatically removed.','muted'))
-        self.cv.addWidget(button('Open Backup Manager',self.backup_manager))
-        self.cv.addWidget(label('Data folder: '+str(BASE),'muted'));self.cv.addStretch()
+        self.header('SETTINGS','APPLICATION / CONFIGURATION')
+        def section(title,description,action,callback,primary=False):
+            panel=QFrame();panel.setObjectName('surface')
+            col=layout_col(panel,12,(18,16,18,16))
+            col.addWidget(label(title,'subheading'))
+            col.addWidget(label(description,'muted'))
+            actions=QWidget();row=layout_row(actions,8)
+            row.addWidget(button(action,callback,primary));row.addStretch()
+            col.addWidget(actions);self.cv.addWidget(panel)
+        section('SOFTWARE UPDATES',f'Installed version: {VERSION}  ·  Updates from GitHub Releases',
+                'CHECK FOR UPDATES',self.check_updates_background)
+        if self.update_info:
+            self.cv.addWidget(button('INSTALL UPDATE '+str(self.update_info['version']),self.install_update,True))
+        self.cv.addSpacing(10)
+        section('CHECKLIST NOTIFICATIONS','Windows and Discord reminders before deadlines, plus overdue alerts.',
+                'CONFIGURE NOTIFICATIONS',self.edit_notification_settings)
+        self.cv.addSpacing(10)
+        section('BACKUPS & RECOVERY','Rolling backups retain 25 saves. Protected and manual snapshots are preserved.',
+                'OPEN BACKUP MANAGER',self.backup_manager)
+        self.cv.addSpacing(16)
+        info=QFrame();info.setObjectName('surface');ic=layout_col(info,9,(18,16,18,16))
+        ic.addWidget(label('DATABASE INFORMATION','subheading'))
+        for title,value in [('TOURNAMENTS',len(self.data.get('tournaments',[]))),
+                            ('REGISTERED TEAMS',len(self.data.get('teams_db',{}))),
+                            ('KNOWN PLAYERS',len(self.player_records()))]:
+            line=QWidget();lr=layout_row(line,8);lr.addWidget(label(title,'muted'),1);lr.addWidget(label(str(value)));ic.addWidget(line)
+        ic.addWidget(label('DATA FOLDER: '+str(BASE),'muted'))
+        self.cv.addWidget(info);self.cv.addStretch()
 
     def protected_backup(self,reason):
         try:
