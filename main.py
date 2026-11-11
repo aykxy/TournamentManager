@@ -472,6 +472,12 @@ class Window(QMainWindow):
         cr.addWidget(button('RECENTLY DELETED',self.restore_tournament))
         self.cv.addWidget(controls)
         self.cv.addSpacing(12)
+        filters=QWidget();filter_row=layout_row(filters,5)
+        active_filter={'value':'ALL'};filter_buttons={}
+        for status in ('ALL','UPCOMING','ACTIVE','COMPLETED'):
+            tab=button(status,lambda checked=False,key=status:set_filter(key))
+            filter_buttons[status]=tab;filter_row.addWidget(tab)
+        filter_row.addStretch();self.cv.addWidget(filters)
         count=label('','muted');self.cv.addWidget(count)
         holder=QWidget();rows_layout=layout_col(holder,8)
         self.cv.addWidget(holder,1)
@@ -482,15 +488,25 @@ class Window(QMainWindow):
                 if item.widget():item.widget().deleteLater()
             tournaments=[t for t in reversed(self.data['tournaments'])
                          if search.text().strip().lower() in
-                         (t.get('name','')+' '+t.get('format','')+' '+t.get('status','')).lower()]
+                         (t.get('name','')+' '+t.get('format','')+' '+t.get('status','')).lower()
+                         and (active_filter['value']=='ALL' or
+                              (active_filter['value']=='COMPLETED' and t.get('status','').lower() in ('finished','completed')) or
+                              (active_filter['value']=='ACTIVE' and t.get('status','').lower() in ('active','in progress','live')) or
+                              (active_filter['value']=='UPCOMING' and t.get('status','').lower() not in ('finished','completed','active','in progress','live')))]
             count.setText(f'{len(tournaments)} / {len(self.data["tournaments"])} TOURNAMENTS')
             if not tournaments:
                 rows_layout.addWidget(label('NO MATCHING TOURNAMENTS' if search.text().strip() else 'NO TOURNAMENTS YET','muted'))
             else:
                 self.tournament_rows(tournaments,rows_layout)
             rows_layout.addStretch()
+        def set_filter(value):
+            active_filter['value']=value
+            for key,tab in filter_buttons.items():
+                tab.setObjectName('tabActive' if key==value else 'tab')
+                tab.style().unpolish(tab);tab.style().polish(tab)
+            refresh()
         search.textChanged.connect(refresh)
-        refresh()
+        set_filter('ALL')
 
     def tournament_rows(self,ts,target=None):
         target=target or self.cv
