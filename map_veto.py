@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont
+from PySide6.QtGui import QPixmap, QGuiApplication, QPainter, QColor, QFont, QLinearGradient
 from PySide6.QtWidgets import (
     QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QLineEdit,
     QFileDialog,QMessageBox,QScrollArea,QGridLayout,QInputDialog,QDialog,QDialogButtonBox
@@ -145,6 +145,37 @@ def image_label(path, width=330, height=185):
             return w
     w.setText('MAP IMAGE NOT UPLOADED')
     return w
+
+
+class MapStatusCard(QFrame):
+    """Draw a subtle coloured glow inward from every edge for selected maps."""
+    def __init__(self,status,parent=None):
+        super().__init__(parent)
+        self.status=status
+        self.setObjectName('surface')
+
+    def paintEvent(self,event):
+        super().paintEvent(event)
+        if self.status not in ('BANNED','PICKED','DECIDER'):
+            return
+        colour=QColor('#ff4556' if self.status=='BANNED' else '#00d78a')
+        painter=QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        width,height=self.width(),self.height()
+        depth=min(38,width//4,height//4)
+        if depth<=0:return
+        for x1,y1,x2,y2,area in (
+            (0,0,depth,0,(0,0,depth,height)),
+            (width,0,width-depth,0,(width-depth,0,depth,height)),
+            (0,0,0,depth,(0,0,width,depth)),
+            (0,height,0,height-depth,(0,height-depth,width,depth)),
+        ):
+            gradient=QLinearGradient(x1,y1,x2,y2)
+            outer=QColor(colour);outer.setAlpha(105)
+            inner=QColor(colour);inner.setAlpha(0)
+            gradient.setColorAt(0,outer);gradient.setColorAt(1,inner)
+            painter.fillRect(*area,gradient)
+        painter.end()
 
 
 class VetoPage:
@@ -330,7 +361,7 @@ class VetoPage:
         for i,m in enumerate(record['pool']):
             action=actions.get(m['id'])
             status=('BANNED' if action['kind']=='ban' else 'PICKED') if action else ('DECIDER' if decider and decider['map_id']==m['id'] else 'AVAILABLE')
-            card=QFrame();card.setObjectName('surface');cv=QVBoxLayout(card);cv.setSpacing(5)
+            card=MapStatusCard(status);cv=QVBoxLayout(card);cv.setSpacing(5)
             cv.addWidget(image_label(m.get('preview'),190,105))
             cv.addWidget(label(m['name']))
             colour={'BANNED':'#ff4556','PICKED':'#00d78a','DECIDER':'#00d78a','AVAILABLE':'#bfc1c6'}[status]
@@ -359,7 +390,7 @@ class VetoPage:
             rv.addWidget(label('SIDE PICK — '+record['teams'][owner].upper()))
             rv.addWidget(label(name_of(record,side['map_id'])+' · Other team gets opposite side.',True))
             map_rec=next(m for m in record['pool'] if m['id']==side['map_id'])
-            rv.addWidget(image_label(map_rec.get('spawns'),340,190))
+            rv.addWidget(image_label(map_rec.get('spawns'),340,155))
             choices=QWidget();cr=QHBoxLayout(choices);cr.setContentsMargins(0,0,0,0)
             def choose_side(colour):
                 apply_side(record,side['map_id'],colour)
@@ -367,12 +398,20 @@ class VetoPage:
             cr.addWidget(btn('RED',lambda:choose_side('RED'),True))
             cr.addWidget(btn('BLUE',lambda:choose_side('BLUE'),True))
             rv.addWidget(choices)
-        rv.addWidget(label('CONFIRMED SIDES'))
+        # Once side picking is finished, show confirmed assignments in place
+        # of the now-irrelevant pending side panel, not below its old position.
+        if record.get('completed'):
+            rv.addWidget(label('CONFIRMED SIDES — FINAL'))
+        else:
+            rv.addWidget(label('CONFIRMED SIDES'))
         for action in selected_maps(record):
             chosen=record.get('sides',{}).get(action['map_id'])
             if chosen:
                 owner=side_owner(record,action)
-                rv.addWidget(label(name_of(record,action['map_id'])+' — '+record['teams'][owner]+': '+chosen))
+                opposite='BLUE' if chosen=='RED' else 'RED'
+                rv.addWidget(label(name_of(record,action['map_id'])+' — '+
+                                   record['teams'][owner]+': '+chosen+'  |  '+
+                                   record['teams'][1-owner]+': '+opposite))
         rv.addStretch()
         def undo_action():
             if record.get('sides'):
