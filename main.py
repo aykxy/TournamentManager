@@ -406,24 +406,56 @@ class Window(QMainWindow):
             cv.addWidget(button('OPEN TOURNAMENT  →',lambda checked=False,tid=t['id']:self.open_t(tid)))
             left_col.addWidget(card)
         left_col.addStretch()
-        right_col.addWidget(label('OPERATIONS','subheading'))
-        side=QFrame();side.setObjectName('surface')
-        sc=layout_col(side,12,(15,15,15,15))
-        sc.addWidget(label('COMPETITIVE SNAPSHOT','muted'))
-        for title,value in [
-            ('TOTAL TOURNAMENTS',len(self.data.get('tournaments',[]))),
-            ('KNOWN PLAYERS',len(self.player_records())),
-            ('REGISTERED TEAMS',len(self.data.get('teams_db',{})))]:
-            line=QWidget();lr=layout_row(line,8)
-            lr.addWidget(label(title,'muted'),1)
-            number=label(str(value));number.setStyleSheet('color:#58d900;font-weight:700;')
-            lr.addWidget(number)
-            sc.addWidget(line)
+        right_col.addWidget(label('ACTION REQUIRED','subheading'))
+        side=QFrame();side.setObjectName('surface');sc=layout_col(side,10,(15,15,15,15))
+        sc.addWidget(label(f'{total_pending} PENDING TASKS','subheading'))
+        sc.addWidget(label(f'{attention} TOURNAMENTS NEED ATTENTION','muted'))
+        shown=0
+        for item in items:
+            for key,name,kind in item['pending']:
+                if shown>=5:break
+                sc.addWidget(button(name,lambda checked=False,tid=item['tournament']['id'],k=key:self.open_overview_task(tid,k)))
+                shown+=1
+            if shown>=5:break
+        if not shown:sc.addWidget(label('NO OUTSTANDING TASKS','muted'))
         right_col.addWidget(side)
         right_col.addStretch()
         body_row.addWidget(left,3)
         body_row.addWidget(right,1)
         self.cv.addWidget(body,1)
+        self.cv.addSpacing(18)
+        self.cv.addWidget(label('HISTORICAL ANALYTICS','subheading'))
+        history=QWidget();hr=layout_row(history,12)
+        all_tournaments=self.data.get('tournaments',[])
+        completed=[t for t in all_tournaments if t.get('status','').lower() in ('finished','completed')]
+        appearances=self.player_records()
+        metrics=[('TOTAL TOURNAMENTS',len(all_tournaments)),
+                 ('COMPLETED TOURNAMENTS',len(completed)),
+                 ('KNOWN PLAYERS',len(appearances)),
+                 ('PLAYERS WITH APPEARANCES',sum(bool(p.get('appearances')) for p in appearances.values()))]
+        for heading,value in metrics:
+            panel=QFrame();panel.setObjectName('surface');pc=layout_col(panel,7,(14,12,14,12))
+            pc.addWidget(label(heading,'muted'))
+            metric=label(str(value),'heading');metric.setStyleSheet('color:#58dc00;font-size:24px;')
+            pc.addWidget(metric);hr.addWidget(panel,1)
+        self.cv.addWidget(history)
+        monthly={}
+        for tournament in all_tournaments:
+            dates=tournament.get('dates') or ([tournament.get('date')] if tournament.get('date') else [])
+            if dates:
+                month=str(dates[0])[:7]
+                if len(month)==7:monthly[month]=monthly.get(month,0)+1
+        chart=QFrame();chart.setObjectName('surface');cc=layout_col(chart,10,(16,14,16,14))
+        cc.addWidget(label('TOURNAMENT ACTIVITY BY MONTH','subheading'))
+        if monthly:
+            for month,amount in sorted(monthly.items())[-8:]:
+                line=QWidget();lr=layout_row(line,10)
+                name=label(month,'muted');name.setMinimumWidth(85);lr.addWidget(name)
+                bar=QProgressBar();bar.setRange(0,max(monthly.values()));bar.setValue(amount);bar.setTextVisible(False)
+                lr.addWidget(bar,1);lr.addWidget(label(str(amount)));cc.addWidget(line)
+        else:cc.addWidget(label('No tournament history recorded yet.','muted'))
+        self.cv.addSpacing(12);self.cv.addWidget(chart)
+
 
     def open_overview_task(self,tournament_id,key):
         self.open_t(tournament_id)
