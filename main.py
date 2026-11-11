@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFrame,QVBoxLayo
 
 BASE=Path.home()/'ArenaTournamentManager'; BASE.mkdir(exist_ok=True)
 DATA=BASE/'tournaments.json'
-ASSET=Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'assets'/'arena_logo.png'
+ASSETS_DIR=Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'assets'
+ASSET=ASSETS_DIR/'arena_logo.png'
+ICON_ASSET=ASSETS_DIR/'arena_logo.ico'
 GREEN='#58dc00'
 VERSION='1.0.3'
 BACKUPS=BASE/'backups'; BACKUPS.mkdir(exist_ok=True)
@@ -175,7 +177,8 @@ class Window(QMainWindow):
         self.active=None;self.section='Overview';self.tab='Checklist'
         self.update_info=None;self.update_busy=False;self.update_dialog=None;self.update_signals=UpdateSignals();self.update_signals.found.connect(self.update_found);self.update_signals.progress.connect(self.update_progress);self.update_signals.staged.connect(self.update_staged);self.update_signals.failed.connect(self.update_failed)
         self.setWindowTitle('Arena Tournament Manager');self.resize(1420,890);self.setMinimumSize(1050,680)
-        if ASSET.exists():self.setWindowIcon(QIcon(str(ASSET)))
+        if ICON_ASSET.exists():self.setWindowIcon(QIcon(str(ICON_ASSET)))
+        elif ASSET.exists():self.setWindowIcon(QIcon(str(ASSET)))
         shell=QWidget();shell.setObjectName("appRoot");self.setCentralWidget(shell);root=layout_row(shell,0)
         self.sidebar=QFrame();self.sidebar.setObjectName('sidebar');self.sidebar.setFixedWidth(211);sv=layout_col(self.sidebar,3,(0,12,0,12));root.addWidget(self.sidebar)
         brand=QWidget();br=layout_row(brand,10,(16,0,12,0));brand.setMinimumHeight(54)
@@ -1359,6 +1362,8 @@ if __name__=='__main__':
         except (AttributeError, OSError):
             pass
     app=QApplication(sys.argv);app.setStyle('Fusion')
+    if ICON_ASSET.exists():app.setWindowIcon(QIcon(str(ICON_ASSET)))
+    elif ASSET.exists():app.setWindowIcon(QIcon(str(ASSET)))
     font_path=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))/'assets'/'Rajdhani-SemiBold.ttf'
     if font_path.exists():
         font_id=QFontDatabase.addApplicationFont(str(font_path))
