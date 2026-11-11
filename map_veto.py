@@ -230,7 +230,7 @@ class VetoPage:
 
     def _assets(self):
         from pathlib import Path
-        directory=Path.home()/'ArenaTournamentManager'/'map_images'
+        directory=Path(getattr(self.w,'assets_directory',Path.home()/'ArenaTournamentManager'/'map_images'))
         directory.mkdir(parents=True,exist_ok=True)
         return directory
 
@@ -311,9 +311,10 @@ class VetoPage:
             tournament.insertSeparator(tournament.count())
             for t in events:
                 tournament.addItem(title.split(' ')[0]+'  ·  '+str(t.get('name','Unnamed tournament')),t['id'])
-        v.addWidget(label('TOURNAMENT (OPTIONAL)'))
-        v.addWidget(tournament)
-        v.addWidget(label('Choose tournament teams or enter names manually.',True))
+        if not getattr(self.w,'standalone',False):
+            v.addWidget(label('TOURNAMENT (OPTIONAL)'))
+            v.addWidget(tournament)
+            v.addWidget(label('Choose tournament teams or enter names manually.',True))
         def update_teams():
             tid=tournament.currentData()
             selected=next((t for t in tournaments if str(t['id'])==str(tid)),None)
@@ -403,13 +404,13 @@ class VetoPage:
     def history_page_content(self):
         p,v=panel()
         v.addWidget(section_heading('VETO HISTORY'))
-        v.addWidget(label('Browse vetoes by tournament. Unlinked matches are shown separately.',True))
+        v.addWidget(label('Browse previous staff vetoes.' if getattr(self.w,'standalone',False) else 'Browse vetoes by tournament. Unlinked matches are shown separately.',True))
         records=list(reversed(self.data['map_vetoes']))
         if not records:
             v.addWidget(label('No map vetoes recorded yet. Create your first veto to get started.',True))
             self.w.cv.addWidget(p);self.w.cv.addStretch();return
         tree=QTreeWidget()
-        tree.setHeaderLabels(['TOURNAMENT / MATCH','FORMAT','STATUS','ACTIONS'])
+        tree.setHeaderLabels(['MATCH','FORMAT','STATUS','ACTIONS'] if getattr(self.w,'standalone',False) else ['TOURNAMENT / MATCH','FORMAT','STATUS','ACTIONS'])
         tree.setRootIsDecorated(True)
         tree.setAlternatingRowColors(False)
         tree.setIndentation(20)
@@ -441,7 +442,7 @@ class VetoPage:
                 self._veto_history_row(tree,group,record)
             group.setExpanded(True)
         if '__unlinked__' in groups:
-            group=QTreeWidgetItem(['UNLINKED / PRACTICE MATCHES','',
+            group=QTreeWidgetItem(['STAFF MATCHES' if getattr(self.w,'standalone',False) else 'UNLINKED / PRACTICE MATCHES','',
                                    str(len(groups['__unlinked__']))+' VETOES',''])
             tree.addTopLevelItem(group)
             for record in groups['__unlinked__']:
@@ -513,8 +514,9 @@ class VetoPage:
                 tournament.setCurrentIndex(tournament.findData(previous))
                 tournament.blockSignals(False)
         tournament.currentIndexChanged.connect(relink)
-        hv.addWidget(label('LINKED TOURNAMENT'))
-        hv.addWidget(tournament)
+        if not getattr(self.w,'standalone',False):
+            hv.addWidget(label('LINKED TOURNAMENT'))
+            hv.addWidget(tournament)
         self.w.cv.addWidget(heading)
         content=QWidget();columns=QHBoxLayout(content);columns.setContentsMargins(0,0,0,0);columns.setSpacing(14)
         left,lv=panel();right,rv=panel()
