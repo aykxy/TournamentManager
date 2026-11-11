@@ -8,7 +8,7 @@ from notifications import due_events, event_key, send_discord, validate_webhook
 from PySide6.QtCore import Qt, QDate, QDateTime, QSize, QUrl, QTimer, QObject, Signal, QByteArray
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QFontDatabase, QFont
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QStackedWidget,QScrollArea,QTableWidget,QTableWidgetItem,QHeaderView,QLineEdit,QDialog,QFormLayout,QDateEdit,QDateTimeEdit,QComboBox,QSpinBox,QCheckBox,QDialogButtonBox,QFileDialog,QMessageBox,QTextEdit,QInputDialog,QTabWidget,QAbstractItemView,QSplitter,QProgressBar,QGroupBox,QSystemTrayIcon,QStyle)
+from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFrame,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QStackedWidget,QScrollArea,QTableWidget,QTableWidgetItem,QHeaderView,QLineEdit,QDialog,QFormLayout,QDateEdit,QDateTimeEdit,QComboBox,QSpinBox,QCheckBox,QDialogButtonBox,QFileDialog,QMessageBox,QTextEdit,QInputDialog,QTabWidget,QTreeWidget,QTreeWidgetItem,QAbstractItemView,QSplitter,QProgressBar,QGroupBox,QSystemTrayIcon,QStyle)
 
 BASE=Path.home()/'ArenaTournamentManager'; BASE.mkdir(exist_ok=True)
 DATA=BASE/'tournaments.json'
@@ -814,27 +814,50 @@ class Window(QMainWindow):
 
     def unofficial_teams_page(self):
         self.header('UNOFFICIAL TEAMS','CASUAL TOURNAMENT TEAMS / INFORMATION ONLY')
-        self.cv.addWidget(label('Teams from tournaments without locked rosters. These do not affect the official Teams database or transfer windows.','muted'))
+        self.cv.addWidget(label('Browse casual teams by tournament. Newest tournaments appear first; no official rosters or transfer windows are affected.','muted'))
         self.cv.addSpacing(12)
-        search=QLineEdit();search.setPlaceholderText('SEARCH UNOFFICIAL TEAMS, PLAYERS OR TOURNAMENTS...')
+        search=QLineEdit();search.setPlaceholderText('SEARCH TOURNAMENTS, TEAMS OR PLAYERS...')
         self.cv.addWidget(search)
         self.cv.addSpacing(12)
         summary=label('0 UNOFFICIAL TEAM ENTRIES','muted');self.cv.addWidget(summary)
-        table=self.table(['TEAM','TOURNAMENT','PLAYERS','ROSTER'])
-        self.cv.addWidget(table,1)
-        entries=[]
-        for tournament in self.data.get('tournaments',[]):
-            if tournament.get('locked',True):
-                continue
+        tree=QTreeWidget()
+        tree.setHeaderLabels(['TOURNAMENT / TEAM','PLAYERS','ROSTER'])
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(True)
+        tree.setIndentation(20)
+        tree.header().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
+        tree.header().setSectionResizeMode(1,QHeaderView.ResizeMode.ResizeToContents)
+        tree.header().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
+        self.cv.addWidget(tree,1)
+        tournaments=sorted(
+            (t for t in self.data.get('tournaments',[]) if not t.get('locked',True)),
+            key=lambda t: max(t.get('dates') or [t.get('date','')]),
+            reverse=True)
+        groups=[]
+        for tournament in tournaments:
+            date=max(tournament.get('dates') or [tournament.get('date','')])
+            rows=[]
             for team in tournament.get('teams',[]):
                 members=team.get('members',[])
-                entries.append([team.get('name',''),tournament.get('name',''),
-                                str(len(members)),', '.join(self.display_player_name(p) for p in members)])
+                rows.append((team.get('name',''),str(len(members)),
+                             ', '.join(self.display_player_name(p) for p in members)))
+            groups.append((tournament.get('name','Unnamed tournament'),date,rows))
         def refresh():
+            tree.clear()
             query=search.text().strip().casefold()
-            rows=[row for row in entries if not query or query in ' '.join(row).casefold()]
-            self.fill_table(table,rows)
-            summary.setText(f'{len(rows)} / {len(entries)} UNOFFICIAL TEAM ENTRIES')
+            visible=0
+            for name,date,rows in groups:
+                matching=[row for row in rows if not query or query in name.casefold() or
+                          query in ' '.join(row).casefold()]
+                if not matching:
+                    continue
+                heading=QTreeWidgetItem([name+(f'  ·  {date}' if date else ''),str(len(matching))+' teams',''])
+                tree.addTopLevelItem(heading)
+                for row in matching:
+                    heading.addChild(QTreeWidgetItem(list(row)))
+                heading.setExpanded(True)
+                visible+=len(matching)
+            summary.setText(f'{visible} UNOFFICIAL TEAM ENTRIES ACROSS {tree.topLevelItemCount()} TOURNAMENTS')
         search.textChanged.connect(refresh)
         refresh()
 
