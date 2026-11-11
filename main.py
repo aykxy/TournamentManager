@@ -1259,15 +1259,25 @@ class Window(QMainWindow):
         self.update_detail_label.setText('The application will close and reopen automatically.')
         try:
             app_dir=Path(sys.executable).resolve().parent
-            helper=app_dir/'ArenaUpdater.exe'
-            if not helper.exists():
-                raise FileNotFoundError('ArenaUpdater.exe is missing from the installation')
+            # The updater is packaged in onedir mode rather than as a self-extracting
+            # onefile executable. Copy its complete runtime outside the install
+            # directory before replacing any application files.
+            helper_dir=app_dir/'ArenaUpdater'
+            helper=helper_dir/'ArenaUpdater.exe'
+            if not helper.is_file():
+                raise FileNotFoundError('ArenaUpdater/ArenaUpdater.exe is missing from the installation')
             import tempfile
-            temp_helper=Path(tempfile.mkdtemp(prefix='arena-updater-'))/'ArenaUpdater.exe'
-            shutil.copy2(helper,temp_helper)
-            subprocess.Popen([str(temp_helper),'--apply',str(package),str(app_dir),str(os.getpid())],
-                             cwd=str(temp_helper.parent),
-                             creationflags=getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0))
+            temp_dir=Path(tempfile.mkdtemp(prefix='arena-updater-'))
+            temp_helper_dir=temp_dir/'ArenaUpdater'
+            try:
+                shutil.copytree(helper_dir,temp_helper_dir)
+                temp_helper=temp_helper_dir/'ArenaUpdater.exe'
+                subprocess.Popen([str(temp_helper),'--apply',str(package),str(app_dir),str(os.getpid())],
+                                 cwd=str(temp_helper_dir),
+                                 creationflags=getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0))
+            except Exception:
+                shutil.rmtree(temp_dir,ignore_errors=True)
+                raise
             QApplication.instance().quit()
         except Exception as exc:
             self.update_failed(str(exc))
