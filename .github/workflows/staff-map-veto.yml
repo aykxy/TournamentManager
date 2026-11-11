@@ -1,0 +1,48 @@
+name: Build standalone staff map veto
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'staff_map_veto.py'
+      - 'map_veto.py'
+      - '.github/workflows/staff-map-veto.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install 'PySide6>=6.7,<7' 'pyinstaller==6.16.0' 'pillow==12.0.0'
+      - name: Validate standalone source and veto logic
+        shell: pwsh
+        run: |
+          python -m py_compile staff_map_veto.py map_veto.py
+          python -m unittest discover -s tests -v
+      - name: Prepare application icon and font
+        shell: pwsh
+        run: |
+          python -c "from PIL import Image; image=Image.open('assets/arena_logo.png').convert('RGBA'); image.save('assets/arena_logo.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/google/fonts/main/ofl/rajdhani/Rajdhani-SemiBold.ttf" -OutFile "assets/Rajdhani-SemiBold.ttf"
+      - name: Build portable staff executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --noupx --name ArenaMapVeto --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.ico;assets" --add-data "assets/Rajdhani-SemiBold.ttf;assets" staff_map_veto.py
+          $sha=(Get-FileHash "dist/ArenaMapVeto.exe" -Algorithm SHA256).Hash.ToLower()
+          "$sha  ArenaMapVeto.exe" | Set-Content -Encoding ascii "dist/ArenaMapVeto.exe.sha256"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ArenaMapVeto-Staff-Windows
+          path: |
+            dist/ArenaMapVeto.exe
+            dist/ArenaMapVeto.exe.sha256
