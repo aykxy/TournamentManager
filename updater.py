@@ -128,21 +128,45 @@ def apply(package, app_dir, parent_pid):
         raise RuntimeError('Application executable not found; update cancelled')
     staging = Path(tempfile.mkdtemp(prefix='arena-install-', dir=app_dir.parent))
     backup = app_dir.parent / (app_dir.name + '.previous')
+    installed = False
     try:
         with zipfile.ZipFile(package) as z:
             z.extractall(staging)
         if not (staging / 'ArenaTournamentManager.exe').is_file():
             raise ValueError('Missing executable after extraction')
+        # A stale rollback folder from an earlier update can be removed safely:
+        # the currently installed application remains untouched until staging succeeds.
         if backup.exists():
             shutil.rmtree(backup)
         app_dir.rename(backup)
         try:
             staging.rename(app_dir)
+            installed = True
         except Exception:
             backup.rename(app_dir)
             raise
-        # Keep the previous app version available for manual rollback.
-        subprocess.Popen([str(app_dir/'ArenaTournamentManager.exe')], cwd=str(app_dir), close_fds=True)
+        # Launch the new application before removing the old installation.
+        # If launch fails, restore the previous installation.
+        try:
+            subprocess.Popen([str(app_dir/'ArenaTournamentManager.exe')],
+                             cwd=str(app_dir), close_fds=True)
+        except Exception:
+            failed = app_dir.parent / (app_dir.name + '.failed-update')
+            if failed.exists():
+                shutil.rmtree(failed)
+            app_dir.rename(failed)
+            backup.rename(app_dir)
+            shutil.rmtree(failed, ignore_errors=True)
+            installed = False
+            raise
+        # A successful launch is not a full health check, but it means the
+        # updater can clean up the redundant previous-version folder.
+        try:
+            shutil.rmtree(backup)
+        except OSError:
+            # Do not fail the successful update merely because Windows has a
+            # transient lock on an old file. Clean up on the next update.
+            pass
     finally:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
