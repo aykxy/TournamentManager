@@ -273,8 +273,31 @@ class VetoPage:
             state='COMPLETED' if record.get('completed') else 'IN PROGRESS'
             r.addWidget(label('  VS  '.join(record['teams'])+'  ·  '+record['format']+'  ·  '+state),1)
             r.addWidget(btn('OPEN',lambda checked=False,vid=record['id']:self.open_veto(vid)))
+            r.addWidget(btn('DELETE',lambda checked=False,vid=record['id']:self.delete_veto(vid)))
             v.addWidget(line)
         self.w.cv.addWidget(p);self.w.cv.addStretch()
+
+    def delete_veto(self,vid):
+        record=next((v for v in self.data['map_vetoes'] if v['id']==vid),None)
+        if not record:return
+        title='  VS  '.join(record['teams'])+' ('+record['format']+')'
+        answer=QMessageBox.question(
+            self.w,'Delete map veto',
+            'Permanently delete this map veto?\\n\\n'+title+
+            '\\n\\nAll recorded bans, picks and side selections for this veto will be removed. '
+            'This cannot be undone from Veto History.',
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes:return
+        # Protect the complete database before destructive changes.
+        if self.w.protected_backup('delete_map_veto') is False:return
+        previous=list(self.data['map_vetoes'])
+        self.data['map_vetoes']=[v for v in previous if v['id']!=vid]
+        if not self.save():
+            self.data['map_vetoes']=previous
+            return
+        if self.current==vid:self.current=None
+        self.history_page()
 
     def open_veto(self,vid):
         self.current=vid;self.veto_page()
