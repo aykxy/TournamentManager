@@ -1024,7 +1024,7 @@ class Window(QMainWindow):
                                ('Edit Discord ID',discord_id)]),
             ('COPY & EXPORT',[('Copy player DM',copy_dm),
                              ('Copy commands (comma-separated)',lambda:commands(', ')),
-                             ('Copy commands (one per line)',lambda:commands('\\n'))])
+                             ('Copy commands (one per line)',lambda:commands('\n'))])
         ]:
             group=QWidget();gr=layout_row(group,8)
             title=label(heading,'muted');title.setMinimumWidth(110);gr.addWidget(title)
