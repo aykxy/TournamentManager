@@ -2,15 +2,18 @@ name: Build standalone staff map veto
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'staff_map_veto.py'
-      - 'map_veto.py'
-      - '.github/workflows/staff-map-veto.yml'
+    inputs:
+      publish_release:
+        description: 'Publish a tested staff release (requires unique version)'
+        type: boolean
+        default: false
+      version:
+        description: 'Staff version (e.g. 1.0.0)'
+        type: string
+        default: '1.0.0'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -24,12 +27,20 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install 'PySide6>=6.7,<7' 'pyinstaller==6.16.0' 'pillow==12.0.0'
-      - name: Validate standalone source and veto logic
+      - name: Validate standalone code and map assets
         shell: pwsh
         run: |
-          python -m py_compile staff_map_veto.py map_veto.py
+          python -m py_compile staff_map_veto.py staff_update.py map_veto.py
           python -m unittest discover -s tests -v
-      - name: Prepare application icon and font
+          python -c "from pathlib import Path; names=['barrio','city-hall','little-seoul','mirror-park','morningwood','paleto-v2','sandy','southside']; missing=[str(Path('assets/maps')/n/f) for n in names for f in ['preview.png','spawns.png'] if not (Path('assets/maps')/n/f).is_file()]; assert not missing, 'Missing map assets: '+', '.join(missing)"
+      - name: Validate staff release version
+        if: ${{ inputs.publish_release }}
+        shell: pwsh
+        env:
+          STAFF_VERSION: ${{ inputs.version }}
+        run: |
+          python -c "import os,re; from staff_update import VERSION; value=os.environ['STAFF_VERSION']; assert re.fullmatch(r'[0-9]+\\.[0-9]+\\.[0-9]+',value), 'Invalid version'; assert VERSION==value, 'Update staff_update.py VERSION to match release version'"
+      - name: Prepare icon and font
         shell: pwsh
         run: |
           python -c "from PIL import Image; image=Image.open('assets/arena_logo.png').convert('RGBA'); image.save('assets/arena_logo.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
@@ -37,7 +48,7 @@ jobs:
       - name: Build portable staff executable
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --noupx --name ArenaMapVeto --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.ico;assets" --add-data "assets/Rajdhani-SemiBold.ttf;assets" staff_map_veto.py
+          pyinstaller --noconfirm --clean --onefile --windowed --noupx --name ArenaMapVeto --icon "assets/arena_logo.ico" --add-data "assets/arena_logo.ico;assets" --add-data "assets/Rajdhani-SemiBold.ttf;assets" --add-data "assets/maps;assets/maps" staff_map_veto.py
           $sha=(Get-FileHash "dist/ArenaMapVeto.exe" -Algorithm SHA256).Hash.ToLower()
           "$sha  ArenaMapVeto.exe" | Set-Content -Encoding ascii "dist/ArenaMapVeto.exe.sha256"
       - uses: actions/upload-artifact@v6
@@ -46,3 +57,11 @@ jobs:
           path: |
             dist/ArenaMapVeto.exe
             dist/ArenaMapVeto.exe.sha256
+      - name: Publish staff release
+        if: ${{ inputs.publish_release }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAFF_VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "staff-v$env:STAFF_VERSION" "dist/ArenaMapVeto.exe" "dist/ArenaMapVeto.exe.sha256" --title "Arena Map Veto Staff v$env:STAFF_VERSION" --notes "Standalone staff Map Veto. Map images bundled; saved veto data preserved." --latest=false
