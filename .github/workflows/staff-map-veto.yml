@@ -39,7 +39,7 @@ jobs:
         env:
           STAFF_VERSION: ${{ inputs.version }}
         run: |
-          python -c "import os,re; from staff_update import VERSION; value=os.environ['STAFF_VERSION']; assert re.fullmatch(r'[0-9]+\\.[0-9]+\\.[0-9]+',value), 'Invalid version'; assert VERSION==value, 'Update staff_update.py VERSION to match release version'"
+          python -c "import os,re; from staff_update import VERSION; value=os.environ['STAFF_VERSION']; assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',value), 'Invalid version'; assert VERSION==value, 'Update staff_update.py VERSION to match release version'"
       - name: Prepare icon and font
         shell: pwsh
         run: |
