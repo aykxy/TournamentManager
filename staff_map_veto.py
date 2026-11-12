@@ -90,6 +90,10 @@ class StaffVetoWindow(QMainWindow):
         self.cv = QVBoxLayout(self.body)
         self.cv.setContentsMargins(0, 0, 0, 0)
         self.cv.setSpacing(12)
+        # Keep the heading, tabs and empty-state panel together at the top.
+        # Without top alignment, Qt expands each widget to fill the scroll viewport
+        # when no map pool or veto history exists.
+        self.cv.setAlignment(Qt.AlignmentFlag.AlignTop)
         scroll.setWidget(self.body)
         layout.addWidget(scroll)
         self.setCentralWidget(root)
