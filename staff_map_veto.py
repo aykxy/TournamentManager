@@ -7,10 +7,15 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QMessageBox, QScrollArea
 from map_veto import VetoPage
+from staff_update import StaffUpdateController, install_from_staged
 
 ROOT = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'ArenaMapVeto'
 DATA = ROOT / 'map_veto.json'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'assets'
+DEFAULT_MAPS = [('Barrio','barrio'), ('City Hall','city-hall'),
+                ('Little Seoul','little-seoul'), ('Mirror Park','mirror-park'),
+                ('Morningwood','morningwood'), ('Paleto V2','paleto-v2'),
+                ('Sandy','sandy'), ('Southside','southside')]
 STYLE='''
 QWidget {background:transparent;color:#e8e8ec;font-family:"Rajdhani";font-size:13px;}
 QWidget#appRoot {background:#242426;}
@@ -79,6 +84,7 @@ class StaffVetoWindow(QMainWindow):
                         self.data[key] = loaded[key]
             except (OSError, ValueError, TypeError) as exc:
                 QMessageBox.warning(self, 'Unable to load veto history', str(exc))
+        self.install_default_maps()
         root = QWidget()
         root.setObjectName('appRoot')
         layout = QVBoxLayout(root)
@@ -99,6 +105,34 @@ class StaffVetoWindow(QMainWindow):
         self.setCentralWidget(root)
         self.veto = VetoPage(self)
         self.veto.render()
+        self.updates = StaffUpdateController(self)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(1800, self.updates.check)
+
+    def install_default_maps(self):
+        """Install bundled maps only on an empty library; never reset staff edits."""
+        if self.data['map_library']:
+            return
+        import shutil
+        import uuid
+        source = ASSETS / 'maps'
+        if not all((source / slug / image).is_file()
+                   for _, slug in DEFAULT_MAPS for image in ('preview.png', 'spawns.png')):
+            return  # Do not initialise an incomplete rotation.
+        self.assets_directory.mkdir(parents=True, exist_ok=True)
+        library = []
+        for name, slug in DEFAULT_MAPS:
+            paths = {}
+            for key, filename in (('preview','preview.png'), ('spawns','spawns.png')):
+                dest = self.assets_directory / (slug + '-' + filename)
+                if not dest.exists():
+                    shutil.copy2(source / slug / filename, dest)
+                paths[key] = str(dest)
+            library.append({'id': str(uuid.uuid5(uuid.NAMESPACE_URL, 'arena-map-veto/'+slug)),
+                            'name': name, **paths})
+        self.data['map_library'] = library
+        self.data['active_map_ids'] = [m['id'] for m in library if m['name'] != 'City Hall']
+        self.save()
 
     def header(self, title, subtitle):
         heading = QLabel('ARENA  /  ' + title)
@@ -145,6 +179,17 @@ class StaffVetoWindow(QMainWindow):
             return False
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == '--install-update':
+        try:
+            install_from_staged(sys.argv[2], int(sys.argv[3]))
+        except Exception as exc:
+            log = ROOT / 'staff-update-error.log'
+            ROOT.mkdir(parents=True, exist_ok=True)
+            log.write_text(str(exc), encoding='utf-8')
+            if sys.platform == 'win32':
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(None, str(exc), 'Staff update failed', 0x10)
+        return
     if sys.platform == 'win32':
         try:
             import ctypes
